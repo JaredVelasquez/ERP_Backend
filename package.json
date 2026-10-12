@@ -1,0 +1,75 @@
+{
+  "name": "michelle-market-erp",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Michelle Market ERP — inventory, accounting, and documents",
+  "scripts": {
+    "build": "npm run build:gateway && npm run build:identity && npm run build:erp && npm run build:mcps",
+    "build:gateway": "nest build gateway",
+    "build:identity": "nest build identity",
+    "build:erp": "nest build erp",
+    "build:mcps": "nest build mcps",
+    "start:gateway": "nest start gateway",
+    "start:identity": "nest start identity",
+    "start:erp": "nest start erp",
+    "start:mcps": "nest start mcps",
+    "dev:identity": "nest start identity --watch",
+    "dev:erp": "nest start erp --watch",
+    "dev:mcps": "nest start mcps --watch",
+    "dev:gateway": "nest start gateway --watch",
+    "dev": "concurrently -n identity,erp,mcps,gateway -c blue,green,yellow,magenta \"npm:dev:identity\" \"npm:dev:erp\" \"npm:dev:mcps\" \"npm:dev:gateway\"",
+    "lint": "eslint \"{apps,libs}/**/*.ts\" --max-warnings 0",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "http-proxy-middleware": "^3.0.7",
+    "mssql": "^12.7.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^22.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "concurrently": "^9.2.4",
+    "eslint": "^9.16.0",
+    "jest": "^29.7.0",
+    "source-map-support": "^0.5.21",
+    "ts-jest": "^29.2.5",
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsconfig-paths-webpack-plugin": "^4.2.0",
+    "typescript": "^5.7.2"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": ".",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@domain/(.*)$": "<rootDir>/libs/domain/src/$1",
+      "^@application/(.*)$": "<rootDir>/libs/application/src/$1",
+      "^@infrastructure/(.*)$": "<rootDir>/libs/infrastructure/src/$1",
+      "^@presentation/(.*)$": "<rootDir>/libs/presentation/src/$1"
+    }
+  }
+}
