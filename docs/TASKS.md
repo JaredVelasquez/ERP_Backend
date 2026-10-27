@@ -446,3 +446,43 @@ Pendientes. Las tareas de la fase 1 quedan cerradas como están. El detalle est�
 - **Regla de diseño:** enlazar cada documento fiscal a una venta existente y conservar una copia de los datos, precios e impuestos usados al emitirlo. No convertir ni renombrar el comprobante firmado actual como factura fiscal.
 - **Dependencias:** B-002 para la identidad legal real de Michelle Market y confirmación del régimen y mecanismo de autorización antes de habilitar emisión en producción.
 - **Listo cuando:** las reglas y formatos estén validados para el régimen confirmado; correlativos y reintentos sean seguros; correcciones no borren documentos emitidos; impuesto, inventario y contabilidad cuadren; y pasen pruebas de permisos, cálculos, anulaciones y devoluciones, reportes y emisión en el entorno autorizado.
+## Fase 2 — propuesta fiscal y contable
+
+Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión fiscal en producción hasta que el responsable confirme régimen, documentos y mecanismo autorizado.
+
+## T-044 — Perfil y políticas fiscales por empresa
+- **Estado:** [ ] bloqueado por decisiones de negocio.
+- **Deps:** T-043.
+- **Hacer:** configurar perfil legal/fiscal, obligaciones, establecimientos, modalidad de emisión/registro, tasas con vigencia y excepciones sustentadas; aplicar permisos y auditoría.
+- **Regla:** los movimientos internos de inventario no exigen factura de venta; una venta no puede omitir el comprobante aplicable.
+- **Listo cuando:** políticas aisladas por empresa, con historial y validación del servidor en HTTP y MCP.
+
+## T-045 — Ciclo de vida de comprobantes fiscales
+- **Estado:** [ ] bloqueado por validación del responsable fiscal y disponibilidad del mecanismo autorizado.
+- **Deps:** T-044.
+- **Hacer:** enlazar ventas con documentos fiscales inmutables, numeración autorizada, idempotencia, reintento, rechazo, anulación y documentos correctivos.
+- **Listo cuando:** reintentar no duplica documento ni movimiento; una corrección preserva el original; la venta respeta la política fiscal.
+
+## T-046 — Periodos y cierres contables
+- **Estado:** [ ] propuesta; falta aceptar calendario y reglas de cierre/reapertura.
+- **Deps:** T-035, T-041.
+- **Hacer:** periodos, bloqueo de asientos atrasados, permisos de cierre/reapertura, motivo y auditoría; reportes por periodo cerrado.
+- **Listo cuando:** se rechazan escrituras en periodos cerrados salvo reapertura autorizada y cualquier corrección conserva reversos e historial.
+
+## T-047 — Reglas de contabilización fiscal
+- **Estado:** [ ] bloqueado por aprobación de cuentas y tratamiento tributario.
+- **Deps:** T-044, T-045, T-046.
+- **Hacer:** mapear ventas, costo, impuestos, compras, devoluciones y anulaciones a cuentas aprobadas, dentro de transacciones idempotentes.
+- **Listo cuando:** documentos fiscales, movimientos y asientos cuadran y su origen es trazable.
+
+## T-048 — Conciliación fiscal-contable y cierre
+- **Estado:** [ ].
+- **Deps:** T-045, T-047.
+- **Hacer:** reportar diferencias entre ventas, documentos fiscales, impuestos, inventario y mayor; exportar libros confirmados por el responsable.
+- **Listo cuando:** cada diferencia puede rastrearse al documento y corregirse sin alterar documentos emitidos.
+
+## T-049 — Conciliación bancaria
+- **Estado:** [ ] propuesta de fase posterior.
+- **Deps:** T-046.
+- **Hacer:** importar extractos en un formato acordado, sugerir coincidencias y dejar ajustes manuales trazables.
+- **Listo cuando:** el saldo conciliado concuerda con el extracto y diferencias no crean asientos duplicados.

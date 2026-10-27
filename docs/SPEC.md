@@ -444,3 +444,7 @@ Cámara, iOS, plugin nativo de escáner, punto de venta, fiado, factura SAR, rec
 ## 14. Conversaciones del asistente
 
 - El asistente ofrece una vista de conversaci�n en pantalla completa con historial paginado y creaci�n de nuevas conversaciones. El historial se persiste por usuario y empresa, y solo su propietario puede listarlo o abrirlo. Se guardan mensajes de texto y respuestas, nunca bytes de im�genes, videos, documentos ni audio.
+
+## Propuesta de fase 2 (pendiente de aceptación)
+
+El alcance fiscal y contable propuesto está en `docs/PHASE_2_PLAN.md`. No modifica aún los requisitos aprobados de la fase 1 ni autoriza configuración fiscal por defecto.
