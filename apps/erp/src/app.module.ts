@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { CatalogModule } from '@presentation/http/catalog.module';
-import { DocumentsModule } from '@presentation/http/documents.module';
-import { HealthModule } from '@presentation/http/health.module';
-import { InventoryModule } from '@presentation/http/inventory.module';
-import { TenancyModule } from '@presentation/http/tenancy.module';
-import { WorkspaceModule } from '@presentation/http/workspace.module';
+import { CatalogModule } from '@composition/catalog.module';
+import { DocumentsModule } from '@composition/documents.module';
+import { HealthModule } from '@composition/health.module';
+import { InventoryModule } from '@composition/inventory.module';
+import { TenancyModule } from '@composition/tenancy.module';
+import { WorkspaceModule } from '@composition/workspace.module';
 
 @Module({
   imports: [HealthModule.forService('erp'), TenancyModule, CatalogModule, InventoryModule, DocumentsModule, WorkspaceModule],

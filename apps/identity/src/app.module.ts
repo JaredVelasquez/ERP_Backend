@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { HealthModule } from '@presentation/http/health.module';
-import { IdentityModule } from '@presentation/http/identity.module';
+import { HealthModule } from '@composition/health.module';
+import { IdentityModule } from '@composition/identity.module';
 
 @Module({
   imports: [HealthModule.forService('identity'), IdentityModule],

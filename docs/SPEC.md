@@ -12,7 +12,7 @@ Tres repositorios:
 
 | Repo | Rol |
 | --- | --- |
-| `ERP_Backend` | API, MCP, reglas, SQL Server |
+| `ERP_Backend` | API, MCP, reglas, PostgreSQL |
 | `ERP_FRONTEND` | Tienda: web, Electron y Android (Capacitor), misma interfaz |
 | `ERP_ADMIN` | Web para sociedades, empresas, marca y plantillas |
 
@@ -70,7 +70,7 @@ No sembrar estos valores. Quedan en configuración o en `BLOCKERS.md`.
 | --- | --- | --- |
 | D1 | Porcentaje de margen inicial de Michelle | En el Excel aparece un encabezado `0.25`. No se trata como 25% |
 | D2 | RTN, razón social y dirección de Michelle Market | No están en los documentos entregados |
-| D3 | Credenciales y nombre de la base SQL Server | No hay entorno definido |
+| D3 | Credenciales y nombre de la base PostgreSQL | Resuelto para desarrollo local en `ERP_Backend/.env`; producción pendiente de configurar |
 | D4 | Usuarios iniciales y quién firma el comprobante | No hay lista de personas |
 
 ## 6. Requisitos funcionales
@@ -165,6 +165,9 @@ El orden de clases sigue el catálogo de Contabilidad I de la UNAH (compañía c
 | 4.01 | Ingresos operacionales | grupo | no | |
 | 4.01.01 | Ventas | mayor | no | |
 | 4.01.01.001 | Ventas | subcuenta | sí | |
+| 4.02 | Otros ingresos | grupo | no | |
+| 4.02.01 | Ingresos no operacionales | mayor | no | |
+| 4.02.01.001 | Otros ingresos | subcuenta | sí | |
 | 5 | Costos | clase | no | |
 | 5.01 | Costo de ventas | grupo | no | |
 | 5.01.01 | Costo de mercancía | mayor | no | |
@@ -174,6 +177,9 @@ El orden de clases sigue el catálogo de Contabilidad I de la UNAH (compañía c
 | 6.01.01 | Gastos de inventario | mayor | no | |
 | 6.01.01.001 | Merma | subcuenta | sí | |
 | 6.01.01.002 | Ajuste de inventario | subcuenta | sí | |
+| 6.02 | Gastos generales | grupo | no | |
+| 6.02.01 | Gastos operativos generales | mayor | no | |
+| 6.02.01.001 | Gastos generales | subcuenta | sí | |
 
 Reglas de partida editables por tipo de documento. El asiento referencia el documento origen.
 
@@ -181,12 +187,30 @@ Categorías de impuesto sembradas y apagadas en el cálculo: Sin impuesto (prede
 
 Reportes, calculados en el backend: libro diario, libro mayor, balance de comprobación, valuación de inventario, kardex, cambios de precio.
 
+### RF-11 Asientos contables generales
+
+- Permitir registrar ingresos y gastos generales como asientos independientes de inventario, con empresa, fecha, descripción, clave de idempotencia y líneas debe/haber.
+- Cada asiento debe tener por lo menos dos líneas, usar únicamente subcuentas contabilizables y cuadrar al centavo. Un usuario con `accounting:edit` puede registrar; lectura exige `accounting:view`.
+- Los atajos de ingreso y gasto generan líneas contra caja o banco y cuentas generales de ingreso o gasto. El formulario avanzado permite construir cualquier asiento balanceado con subcuentas existentes.
+- No editar ni borrar asientos confirmados. Anular genera un asiento inverso con fecha de anulación y conserva la referencia al original.
+- Libro diario, balance de comprobación, balance general y estado de resultados incluyen asientos operativos y generales. Los reportes de ventas solo incluyen documentos de venta.
+- Las herramientas MCP equivalentes reutilizan los mismos casos de uso y quedan sujetas a permisos y alcances del token.
+
 ### RF-06 Precios e historial
 
 - Precio de venta por presentación.
 - Cada cambio guarda anterior, nuevo, quién, cuándo y motivo.
 - El costo de cada capa queda en la capa. Un cambio manual del costo de referencia del producto también entra al historial.
-- "Aplicar margen" usa el margen del producto o, si no tiene, el de la empresa. Si ninguno existe, la acción no calcula un porcentaje: pide el precio.
+- El recargo mínimo comercial se calcula sobre el costo de referencia. Sin costo o porcentaje configurado no se genera un precio sugerido. El precio de venta aprobado cambia mediante el flujo de propuestas y aprobación.
+
+#### Revisión Michelle Market, 18-10-2026
+
+- En `PRECIOS MICHELLE MARKET.xlsx`, `PRECIO UNITARIO` es **costo unitario de referencia**, `25%` es **recargo mínimo sobre costo**, `TOTAL` es **precio sugerido de venta** (`costo × 1,25`) y `PRECIO VENTA` es **precio de venta aprobado por gerencia**. El recargo no es margen bruto sobre ventas. El precio aprobado puede diferir del sugerido; si queda por debajo, se advierte y se exige motivo, sin impedir que gerencia lo apruebe.
+- El costo de referencia comercial no revaloriza capas de inventario ni cambia el costo contable de compras ya recibidas. El precio vigente reside en la presentación del producto y se aplica a todas las unidades existentes de esa presentación, sin importar la fecha de entrada. Las ventas ya confirmadas conservan su precio histórico.
+- Al confirmar una venta, el servidor lee el precio vigente de la presentación y calcula el importe de la línea. El importe enviado por el cliente nunca sustituye el precio aprobado: si difiere, la caja debe actualizar el ticket antes de cobrar. Una presentación ambigua o sin precio vendible bloquea la venta.
+- La empresa puede designar un usuario aprobador en configuración. El dueño conserva aprobación por defecto. Un usuario con permiso de precios para ver puede proponer; solo el dueño o el aprobador designado puede aprobar o rechazar. El servidor identifica a proponente y aprobador desde la sesión, nunca desde el cuerpo HTTP.
+- Cada propuesta conserva importe anterior, importe propuesto, motivo, proponente, estado y resolución. La aprobación verifica que el precio base siga vigente y, en una transacción, actualiza la presentación, crea `price_changes` y resuelve la propuesta. Una propuesta obsoleta no sobrescribe cambios posteriores.
+- Los cambios de costo de referencia, recargo mínimo, sugerido y precio aprobado tienen historia con origen, actor y fecha. La importación del libro solo aplica coincidencias inequívocas; filas repetidas con valores incompatibles quedan en conciliación.
 
 ### RF-07 Tablero
 
@@ -210,6 +234,8 @@ La alta crea productos y un documento de saldo inicial. El conteo compara contra
 
 El libro `PRECIOS MICHELLE MARKET.xlsx` no se importa tal cual. Tiene categorías como filas, fórmulas y notas personales. Esas notas no entran al sistema.
 
+La hoja `PRECIOS dif` puede alimentar una importación local supervisada de las cuatro columnas de precio. Se ignoran las demás hojas y las filas sin números válidos. Se conserva el número de fila como referencia de origen. La importación no crea existencias ni modifica capas PEPS.
+
 ### RF-09 Comprobante Ficohsa Tengo
 
 Plantilla HTML administrable. Formulario:
@@ -220,9 +246,11 @@ Plantilla HTML administrable. Formulario:
 - Firma dibujada en pantalla.
 - Referencia bancaria: el número que muestra el banco. Puede ir vacía en el borrador. Al confirmar o descargar es obligatoria y sale en el PDF como "Referencia bancaria".
 - Enlace opcional al traslado de dinero ya contabilizado (Caja, POS, transferencias o bancos). El comprobante y el traslado son de la misma empresa. Un traslado de otra empresa se rechaza. Firmar no crea otro asiento: el traslado sigue siendo el asiento.
-- Confirmar es idempotente. Anular marca el comprobante como anulado y deja visibles la referencia y el enlace. No borra ni reversa el traslado.
+- Confirmar es idempotente. Anular requiere una solicitud con motivo y aprobaci�n del due�o o del encargado de anulaciones designado en Configuraci�n. El solicitante no puede aprobar su propia solicitud. La resoluci�n conserva qui�n, cu�ndo y la decisi�n; deja visibles la referencia y el enlace, y no borra ni reversa el traslado.
 
-Se guarda el formulario, la firma y ese enlace. La descarga arma el PDF. La firma es un trazo, no una firma electrónica certificada. El papel original trae seis copias; el PDF de esta fase es un ejemplar.
+Se guarda el formulario, la firma y ese enlace. La descarga arma el PDF. La firma es un trazo, no una firma electrónica certificada. El papel original trae seis copias; la descarga genera una sola copia ampliada, por decisión del usuario.
+
+El PDF generado y el comprobante bancario adjunto (PDF, PNG o JPG) se guardan en el bucket privado configurado por entorno. La base registra sus claves y metadatos asociados al comprobante; la API solo los sirve con sesión y empresa verificadas. La pantalla permite abrir cada archivo individualmente, compararlos lado a lado, ocultar cualquiera de los dos y ampliar la vista a pantalla completa. Agregar un archivo POS siempre se identifica como adjunto adicional al comprobante manual. `S3_ENDPOINT`, `S3_BUCKET` y `S3_VOUCHER_PREFIX` determinan destino y prefijo sin guardar URLs públicas.
 
 ### RF-10 MCP
 
@@ -396,3 +424,23 @@ Tools MCP: `render-barcode-sheet`, `search-products-by-name`, `read-stock-card`,
 ### 12.10 Fuera de la fase 2
 
 Cámara, iOS, plugin nativo de escáner, punto de venta, fiado, factura SAR, recetas, envase, un tercer tipo de documento, plantilla nueva en el admin y carga del Excel de precios.
+
+## 13. Asistente ERP e integraciones MCP
+
+- La aplicación usa un access token Bearer de vida corta y un refresh token rotatorio. En Web, el refresh vive en cookie `HttpOnly`, `Secure` en producción, `SameSite=Lax` y con path limitado a identidad; el access token solo vive en memoria. Las sesiones se guardan con hashes, y reutilizar un refresh consumido revoca su familia. El asistente usa el mismo contexto de usuario y empresa; las integraciones MCP conservan su token propio y alcance limitado.
+- Puede recibir imágenes, un PDF de hasta 4 MB con Gemini o Anthropic, una grabación de voz de hasta dos minutos y 4 MB con Gemini/OpenAI, o un video del que la tienda extrae hasta cuatro fotogramas. Las grabaciones se procesan en la solicitud y no se persisten; Anthropic no admite audio en este flujo. El audio extraído de video y el resto del video no se analizan. Una factura puede servir para identificar datos, pero ningún renglón se registra sin producto, presentación, cantidad y costo verificados por una persona.
+- `POST /mcp/tools/analyze-media` ofrece extracción visual a integraciones con permiso `inventory` ver. `search-products-by-name` y `read-product` permiten cotejar productos y presentaciones; `confirm-document` registra una compra solo con permiso `inventory` editar. La extracción nunca confirma un documento por sí sola.
+- Un token de integración pertenece a un usuario y una empresa, guarda solo su hash, caduca y puede revocarse. Al emitirlo se elige `consulta`, `operacion`, `catalogo`, `gerencia` o herramientas concretas. Una llamada requiere la herramienta dentro del token y el permiso vigente de su propietario; cambiar los grants o revocar el token surte efecto en la siguiente llamada. La pantalla muestra el secreto una sola vez.
+- `GET /mcp/token-options`, `GET /mcp/tokens`, `POST /mcp/tokens` y `DELETE /mcp/tokens/:id` solo aceptan cookie de sesión. `POST /mcp/tools/:name` acepta cookie o token MCP en `Authorization: Bearer`. No hay una tool pública de login que emita tokens de integración.
+
+### 13.1 Configuración de empresa y trazabilidad
+
+- La membresía de una empresa se puede deshabilitar sin borrar al usuario. El inicio de sesión, las sesiones vigentes y los tokens MCP dejan de autorizar esa empresa en cuanto se deshabilita. Las demás membresías del usuario siguen independientes.
+- `settings` es un módulo con acceso `view` o `edit`. El dueño conserva `edit` y solo él puede delegar el módulo mediante los grants. Un editor delegado puede crear empleados y habilitar o deshabilitar su membresía; los permisos iniciales del nuevo empleado no pueden superar los del creador. Solo el dueño puede cambiar grants. Cada usuario cambia su propia clave con la clave actual; esto invalida sus sesiones.
+- El dueño o aprobador de precios designado puede cambiar el precio vigente directamente para una presentación. Se registra el actor, motivo, precio anterior y nuevo en ambos historiales. Todos los lotes existentes de esa presentación usan el nuevo precio de venta. Los demás usuarios proponen un cambio pendiente de aprobación.
+- El asistente admite Gemini, Anthropic y OpenAI, con modelo y token configurables por empresa. El token se cifra con AES-256-GCM y la clave `ERP_AI_ENCRYPTION_KEY`; la interfaz solo muestra sus últimos cuatro caracteres. La configuración global de entorno actúa como valor inicial hasta que la empresa guarda uno propio.
+- La auditoría MCP registra el identificador del token usado, usuario, empresa, herramienta, resultado y fecha. El dashboard de conectores lista tokens de la empresa, su creador, caducidad y último uso. El alcance de cada token se vuelve a cruzar con la membresía activa y grants del dueño en cada llamada.
+- Los PDF descargables de comprobantes confirmados se guardan en el bucket S3 privado `erp`, con prefijo `S3_VOUCHER_PREFIX/{comprobante}/`. No se emiten enlaces públicos; el ERP entrega el archivo tras validar sesión y pertenencia a la empresa.
+## 14. Conversaciones del asistente
+
+- El asistente ofrece una vista de conversaci�n en pantalla completa con historial paginado y creaci�n de nuevas conversaciones. El historial se persiste por usuario y empresa, y solo su propietario puede listarlo o abrirlo. Se guardan mensajes de texto y respuestas, nunca bytes de im�genes, videos, documentos ni audio.

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { HealthModule } from '@presentation/http/health.module';
-import { McpModule } from '@presentation/http/mcp.module';
+import { HealthModule } from '@composition/health.module';
+import { McpModule } from '@composition/mcp.module';
 
 @Module({
   imports: [HealthModule.forService('mcps'), McpModule],

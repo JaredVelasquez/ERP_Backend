@@ -78,6 +78,13 @@ Una tarea a la vez. `[ ]` pendiente, `[~]` en curso, `[x]` cerrada. No se marca 
   - [ ] El gateway exige sesión salvo `/identity` login y `/health`
 - **Listo cuando:** un operador no abre rutas de catálogo contable ni de plataforma
 
+## T-006b — Elegir empresa antes de crear sesión
+
+- **Estado:** [x]
+- **Deps:** T-006
+- **Hacer:** validar email y contraseña en `POST /identity/companies` sin crear sesión; devolver solo las membresías del usuario autenticado; elegir una en el login cuando haya varias; mantener el ingreso directo cuando haya una.
+- **Listo cuando:** una contraseña errónea no revela empresas y un usuario con varias membresías puede seleccionar la correcta antes de iniciar sesión.
+
 ## T-007 — Semilla contable y árbol
 
 - **Estado:** [x]
@@ -104,12 +111,34 @@ Una tarea a la vez. `[ ]` pendiente, `[~]` en curso, `[x]` cerrada. No se marca 
 ## T-010 — Historial de precios
 
 - **Estado:** [x]
-- **Nota:** sin porcentaje no hay precio. 0.25 no se trata como 25%. Una entrada no mueve el precio de estante.
+- **Nota:** una entrada no mueve el precio de estante. El cálculo comercial vigente usa recargo mínimo sobre costo y aprobación, según T-031 y T-032; las rutas antiguas de cambio directo se retiraron.
+
+## T-031 — Modelo comercial de precios Michelle Market
+
+- **Estado:** [x]
+- **Deps:** T-010, T-030
+- **Hacer:** migración PostgreSQL incremental para costo unitario de referencia, recargo mínimo, sugerido, precio aprobado e historia; conciliar e importar la hoja `PRECIOS dif` sin notas personales ni filas ambiguas; mostrar las cuatro magnitudes en el catálogo.
+- **Resultado:** 2.015 coincidencias únicas importadas; 116 productos con valores incompatibles quedan en `docs/PRICE_CONFLICTS_MICHELLE_MARKET.csv` para decisión gerencial. Dos filas con nombre ambiguo en el catálogo tampoco se aplicaron.
+
+## T-032 — Propuestas, aprobación y configuración de precios
+
+- **Estado:** [x]
+- **Deps:** T-031
+- **Hacer:** propuestas de empleados, aprobación por dueño o delegado, autorización por sesión, cambio atómico del precio vigente de toda la presentación y UI con estados e historial.
+
+## T-033 — Plantilla de comprobante y marca Michelle Market
+
+- **Estado:** [x]
+- **Deps:** T-013
+- **Hacer:** adaptar el comprobante al PDF original, colocar los logos oficiales según fondo claro u oscuro y verificar la descarga legible.
+- **Resultado:** una copia ampliada, según decisión del usuario; descarga real inspeccionada.
 
 ## T-011 — Tablero y reportes
 
 - **Estado:** [x]
 - **Nota:** una merma no cuenta como venta ni como ingreso. El balance de un documento anulado queda en cero.
+- **Ampliación:** `GET /erp/reports/sales` y `GET /erp/reports/financial` entregan ventas por día y producto, balance de comprobación con apertura y cierre, balance general y estado de resultados para un período. Los estados contables incluyen los asientos de reversión y exigen permiso de lectura de Contabilidad. Las herramientas MCP `sales-report` y `financial-report` reciben `from` y `to`, limitan los datos a la empresa de la sesión y respetan los permisos del token.
+- **Límite actual:** los estados reflejan los asientos generados por los documentos operativos existentes; `ReceiveEntryUseCase` valida cuentas, pero todavía no registra asientos manuales. Por eso no representan una contabilidad general completa hasta habilitar ese flujo.
 
 ## T-012 — Excel
 
@@ -306,3 +335,114 @@ Pendientes. Las tareas de la fase 1 quedan cerradas como están. El detalle est�
   - [ ] Auditoría sin token, sin contraseña y sin bytes de archivo. La salida guarda el id del documento
   - [ ] Prueba: sin permiso no hay documento; con permiso, una línea y varias líneas
 - **Listo cuando:** `npm run lint`, `npm test` y `npm run build` pasan, y la auditoría de `issue-stock` no guarda secretos
+
+## T-030 — Migrar la base ERP a PostgreSQL
+
+- **Estado:** [x]
+- **Nota:** `erp_dev` y los roles `erp_owner`/`erp_app` están creados en PostgreSQL local. Las migraciones por base de datos y los datos transferidos se conciliaron. SQL Server/LocalDB se retiraron y PostgreSQL es el único motor soportado. Ver `PLAN_POSTGRESQL_ER.md`.
+- **Dónde:** `migrations/erp/`, scripts PostgreSQL, adapters TypeORM y `.env` local
+- **Verificación:** migraciones reejecutables por checksum, lecturas y escrituras de repositorio, HTTP, `npm run lint`, `npm test` y `npm run build`
+
+## T-031 — Credenciales MCP con alcance por empresa
+
+- **Rotación:** `POST /mcp/company-tokens/:id/rotate` cambia el hash en una operación de base de datos, renueva la caducidad a 90 días y entrega la nueva credencial una sola vez. También restablece un token revocado limpiando su revocación, sin volver a validar el secreto anterior. Exige `settings:edit`; solo el dueño puede rotar tokens de otros usuarios de su empresa.
+- **Actualización:** `POST /mcp/connector` acepta JSON-RPC MCP sobre HTTP para `initialize`, `tools/list` y `tools/call`; publica solo herramientas incluidas en el token y en los permisos vigentes del usuario. Las llamadas reutilizan la autorización y auditoría existentes.
+- **Estado:** [x]
+- **Alcance:** migración `011_mcp_token_scopes.sql`, tokens con hash, perfil, herramientas, caducidad y revocación. Cada invocación compara el token con su alcance y con la membresía y permisos actuales. El login público de MCP se eliminó.
+- **Comprobación local:** creación, consulta, uso de herramienta autorizada y rechazo 401 después de revocar.
+
+## T-032 — Asistente ERP integrado
+
+- **Estado:** [x] para texto, imagen, PDF con Gemini, fotogramas de video y mensajes de voz con Gemini/OpenAI; [ ] para audio de video.
+- **Voz:** el navegador graba hasta dos minutos, permite escuchar y enviar una grabación de hasta 4 MB. Gemini recibe el audio directamente; OpenAI lo transcribe y continúa con el modelo configurado. La grabación no se persiste. Anthropic no está habilitado para este flujo y el asistente indica cambiar a Gemini u OpenAI.
+- **Alcance:** chat ligado a la cookie de sesión, proveedor Gemini/OpenAI configurable, consultas por MCP y propuestas de escritura que exigen confirmación humana. `analyze-media` expone extracción visual también a tokens MCP con alcance autorizado. El servidor vuelve a validar los permisos al confirmar.
+- **Límite:** registrar inventario desde una factura requiere verificar producto, unidad, cantidad y costo. No se confirma automáticamente a partir de extracción visual.
+
+## T-033 — Configuración de empresa, IA y actividad MCP
+
+- **Estado:** [x] para membresías activas, módulo `settings`, administración básica de usuarios, proveedor/modelo/token de IA por empresa, tablero de conectores e historial de uso MCP.
+- **Migraciones:** `012_company_settings_and_mcp_usage.sql` y `013_company_settings_owner_only.sql` aplicadas en PostgreSQL local.
+- **Seguridad:** un token MCP y una sesión dejan de autorizar una empresa cuando se deshabilita su membresía; el token de IA se cifra y nunca se devuelve en la API.
+- **Límite pendiente:** recuperación de clave de otro usuario requiere un flujo de invitación o recuperación verificada; no se habilita el restablecimiento por un administrador de una sola empresa porque la identidad puede pertenecer a varias empresas.
+
+## T-034 — Cambios de precio directos y estandarización de tablas
+
+- **Estado:** [x] para cambios de precio con historia, tablas configurables y tabla resumida de actividad del tablero; la importacion admite correccion previa en el frontend.
+
+## T-035 — Asientos contables generales
+
+- **Estado:** [x]
+- **Deps:** T-007, T-030, T-011
+- **Verificado en PostgreSQL local y Chrome:** ingreso, gasto y asiento manual; reportes antes y después del reverso; balance de comprobación; repetición idempotente con líneas reordenadas; asiento descuadrado responde 400; usuario sin acceso contable recibe 403.
+- **Hacer:** crear ingresos y gastos generales y asientos manuales balanceados, persistirlos idempotentemente en PostgreSQL, anular por reverso, incluirlos en estados financieros y exponer los mismos casos de uso por HTTP y MCP.
+- **Listo cuando:** solo cuentas contabilizables reciben líneas; el debe iguala al haber; permisos `accounting:view/edit` se aplican en ambas puertas; reintentos no duplican y la anulación conserva historial y cuadra los reportes.
+
+## T-036 — Alinear autenticación con el estándar IATOOLS
+
+- **Estado:** [~]
+- **Deps:** T-006, T-030
+- **Hacer:** reemplazar la sesión única actual por access token Bearer corto y refresh token rotatorio; Web guarda el refresh en cookie `HttpOnly`, `Secure`, `SameSite` y con path limitado; Electron usa `safeStorage`; Capacitor usa Keychain/Keystore; persistir solo hashes y revocar la familia cuando se reutiliza un refresh anterior.
+- **Correcciones incluidas:** login entrega solo el access token corto para mantenerlo en memoria; el refresh token nunca se devuelve en JSON y solo viaja en cookie `HttpOnly`; ninguna cookie de producción puede emitirse sin `Secure`.
+- **Migración:** `015_refresh_token_families.sql` ya está aplicada en PostgreSQL local. Las sesiones anteriores funcionan hasta `2026-10-28T00:00:00Z`; esa fecha también está en el `.env` local.
+- **Evidencia local:** auth HTTP smoke validates login, bearer session, refresh rotation, replay revocation, and logout. A real Chrome smoke validates login, the HttpOnly refresh cookie, and browser reload recovery. Frontend unit tests, lint, build, and backend suite pass. **Pending:** Electron/Capacitor device verification (tracked in T-F006).
+
+## T-037 — Guardar comprobantes en almacenamiento S3 privado
+
+- **Estado:** [x]
+- **Deps:** T-033, T-036
+- **Hacer:** configurar el bucket privado `erp` en Cloudflare R2 y guardar cada PDF confirmado bajo `S3_VOUCHER_PREFIX/{comprobante}/`, con credenciales S3 en variables locales. La descarga continúa pasando por el endpoint autenticado del ERP.
+- **Evidencia local:** `npm run smoke:s3` verifies private object upload/read/delete. `npm run smoke:voucher-storage-http` confirms the real voucher PDF is written to R2, its key is persisted in PostgreSQL and the authenticated download works. Smoke cleanup removes temporary rows and objects.
+
+## T-038 - Attach and preview bank receipts
+
+- **Estado:** [x]
+- **Deps:** T-037
+- **Hacer:** accept PDF/JPG/PNG, save the object and metadata in R2/PostgreSQL, serve it after session and company checks, and allow individual or split preview beside the ERP voucher PDF.
+- **Migraciones:** 016_voucher_file_references.sql for both providers; PostgreSQL uses migrations/erp/016_voucher_file_references.sql.
+- **Evidencia local:** `npm run smoke:voucher-storage-http` verifies authenticated PNG upload/read, replacement, company isolation, PostgreSQL metadata and the one-folder key layout. The documents page provides individual/side-by-side preview and full-screen controls; frontend tests, lint and build pass.
+## T-039 — Aprobacion de anulacion y comparacion de archivos
+
+- **Estado:** [x]
+- **Hacer:** exigir motivo y aprobacion del dueno o encargado designado antes de anular un comprobante; guardar historial y conservar datos bancarios. Ampliar visor para ocultar cualquiera de los paneles, pantalla completa y dejar claro que el comprobante POS se adjunta al manual.
+- **Migracion:** `017_voucher_void_approval.sql`, aplicada en PostgreSQL local.
+- **Nota:** la anulacion directa se reemplazo por solicitud y revision via HTTP/MCP; designacion por empresa en Configuracion; quien solicita no puede aprobar. El visor ofrece modo individual, comparacion y pantalla completa, y explica que el POS es un adjunto adicional.
+- **Verificacion:** `npm run smoke:voucher-storage-http` verifies a pending request, rejects requester self-approval, approves through the designated owner and confirms the voucher status in PostgreSQL. The same smoke checks R2 read/replace and company isolation; frontend preview supports individual, split and full-screen modes. Frontend tests, lint/build and backend suite/lint/build pass.
+
+## T-040 — Idempotencia de importacion de catalogo sin stock inicial
+
+- **Estado:** [x]
+- **Alcance:** cada CSV reserva una clave basada en SHA-256 y empresa antes de guardar productos. La reserva se hace en la misma transaccion que los cambios; un reintento concurrente o posterior no vuelve a ejecutar la importacion, incluso cuando cantidad es cero y no se crea documento de apertura.
+- **Migraciones:** `migrations/erp/018_catalog_import_batches.sql` quedó aplicada en `erp_dev`; la migración SQL Server fue retirada.
+
+## T-041 — TypeORM y persistencia PostgreSQL única
+
+- **Estado:** [x]
+- **Alcance:** migrar todos los repositorios relacionales a TypeORM QueryBuilder, con una entidad y archivo `<repo>.queries.ts` por repo en infrastructure; retirar el traductor SQL de compatibilidad y hacer obligatoria esta convención en la skill backend.
+- **Protección:** `synchronize=false`, `migrationsRun=false`, conservar checksums aplicados, registrar baseline sin DDL de negocio y bloquear migración sobre esquema no registrado.
+- **Ya hecho:** PostgreSQL es el único proveedor; SQL Server/LocalDB y sus scripts/dependencias se retiraron; TypeORM DataSource/QueryRunner, transacciones, migración baseline no destructiva y guardas de migraciones están operativos; importación idempotente, compañías y listados de workspace usan entidades/QueryBuilder con consultas en archivos separados; la skill backend se actualizó; dominio, aplicación, adaptadores de infraestructura y controladores se organizaron por contexto y agregado, y la composición de Nest se movió a `apps/modules/`.
+- **Ya convertido:** repositorios de productos/precios, flujo de propuestas y auditor�a de precios, comprobantes y aprobaci�n de anulaci�n, layouts, MCP, asientos manuales, identidad, configuraci�n de IA y libro de inventario usan entidades con TypeORM QueryBuilder y consultas separadas. Los adaptadores de identidad conservan rotaci�n/reutilizaci�n de refresh tokens; el ledger mantiene atomicidad entre documento, l�neas, capas, asientos y anulaciones.
+- **Verificaci�n:** `erp_test` fue creada y migrada; `smoke:postgres:write` pas� para producto, historial de precios, ledger de inventario e inserci�n/actualizaci�n de comprobante. `smoke:postgres` de lectura pas� contra `erp_dev` (compa��a, identidad/sesi�n, productos, inventario y listados); ese smoke requiere datos existentes. `erp_dev` no fue destino de escritura.
+- **Listo cuando:** cada repositorio relacional use su query builder y mapee a tipos del dominio; no queden adaptadores ni consultas heredadas; lint, suite, build, smoke PostgreSQL y flujos visuales/funcionales pasen sin recrear esquema ni perder datos.
+- **Verificacion actual:** TypeORM y QueryBuilder en repositorios y scripts de mantenimiento; traductor y ejecutor de compatibilidad retirados. Lint, 50 suites/139 pruebas, build y smokes de lectura y escritura pasan; comprobantes/R2, Chrome movil y asistente tambien pasan.
+- **Product repository:** PostgreSQL QueryBuilder entity mapping, search, paging, ordering and price history pass smoke:postgres; null price ordering matches domain sort.
+- **Voucher repository:** TypeORM QueryBuilder persists vouchers and signatures; R2 HTTP smoke passes file upload, read, replacement, tenant isolation and void approval.
+- **Workspace layout repository:** TypeORM QueryBuilder persists table columns, dashboard widgets and UI preferences; save/read/update and cleanup pass the PostgreSQL browser smoke.
+- **MCP repository:** TypeORM QueryBuilder passes token issue, hash lookup, company listing, audit paging, rotation, revocation and usage timestamp checks in the PostgreSQL browser smoke.
+- **Journal-entry repository:** QueryBuilder persists balanced entry lines, idempotent retry, company-scoped reads, date range and reversal in the PostgreSQL browser smoke.
+## T-042 � Historial privado de conversaciones del asistente
+
+- **Estado:** [x]
+- **Alcance:** guardar turnos de texto del asistente vinculados a usuario y empresa de la sesi�n; listar conversaciones paginadas y leer cada conversaci�n con aislamiento por propietario. No persistir archivos adjuntos ni credenciales.
+- **Protecci�n:** migraci�n TypeORM aditiva, sin `synchronize`, sin `migrationsRun` y sin borrar tablas/datos en `down`.
+- **Listo cuando:** dos usuarios de la misma empresa no pueden leer el historial del otro; un usuario con varias empresas mantiene historiales separados; build, lint, tests y smoke HTTP pasan.
+- **Verificacion:** migracion 019 aplicada; 52 suites / 146 pruebas, lint/build y smokes HTTP/Chrome pasan.
+
+## T-043 — Facturación y documentos fiscales SAR
+
+- **Estado:** [ ] Pendiente; fuera del alcance implementado actualmente.
+- **Objetivo:** extender el ERP para emitir y administrar documentos fiscales vinculados a las ventas, manteniendo separados los comprobantes operativos actuales y el módulo fiscal.
+- **Antes de implementar:** confirmar con el contador y el SAR el régimen tributario de cada empresa, los documentos aplicables, los requisitos vigentes de autorización y numeración, y la modalidad de emisión disponible. No asumir que la facturación electrónica está disponible hasta verificar el mecanismo oficial.
+- **Alcance propuesto:** configuración fiscal por empresa y establecimiento; categorías y cálculo de impuestos; documento fiscal con datos legales y detalle inmutable de venta e impuestos; numeración y autorización; representación imprimible; notas de crédito y débito y anulaciones trazables; permisos y auditoría; reportes fiscales y conciliación con los asientos.
+- **Regla de diseño:** enlazar cada documento fiscal a una venta existente y conservar una copia de los datos, precios e impuestos usados al emitirlo. No convertir ni renombrar el comprobante firmado actual como factura fiscal.
+- **Dependencias:** B-002 para la identidad legal real de Michelle Market y confirmación del régimen y mecanismo de autorización antes de habilitar emisión en producción.
+- **Listo cuando:** las reglas y formatos estén validados para el régimen confirmado; correlativos y reintentos sean seguros; correcciones no borren documentos emitidos; impuesto, inventario y contabilidad cuadren; y pasen pruebas de permisos, cálculos, anulaciones y devoluciones, reportes y emisión en el entorno autorizado.

@@ -16,7 +16,7 @@ ERP de inventario, contabilidad básica, precios, tablero, códigos de barra, ca
 | P4 | Trazabilidad | Entradas, salidas, cambios de precio, asientos y llamadas MCP dejan registro. Anular crea el movimiento inverso. No se borra historia. |
 | P5 | Fail safe | El error se persiste o se devuelve tipado. No hay `catch` vacío. Un reintento no abre una segunda transacción a ciegas. |
 | P6 | Secretos fuera del repo | Credenciales solo en `.env` o en el almacén del entorno. Nunca en git. |
-| P7 | Simplicidad | La solución más pequeña que cumple la fase 1. Sin vistas, procedimientos, funciones ni triggers en SQL Server. Sin un sexto proceso “por si acaso”. |
+| P7 | Simplicidad | La solución más pequeña que cumple la fase 1. Sin vistas, procedimientos, funciones ni triggers de negocio en la base de datos. Sin un sexto proceso “por si acaso”. |
 | P8 | Una empresa, unos libros | La contabilidad, el RTN y el inventario pertenecen a la empresa. La sociedad solo agrupa empresas. Dos empresas no comparten saldos ni asientos. |
 | P9 | Misma acción, dos puertas | Cada caso de uso tiene endpoint HTTP y tool MCP equivalente. No hay una segunda regla de negocio para la IA. |
 | P10 | Código en inglés, documentos en español | Identificadores, comentarios y commits en inglés. SPEC, TASKS y mensajes al usuario en español. |
@@ -44,7 +44,7 @@ libs/
 | --- | --- | --- |
 | domain | reglas puras, ports, tokens | `@nestjs/*`, `typeorm`, `mssql`, HTTP |
 | application | orquestar un `execute` | Entity ORM, SQL, controllers |
-| infrastructure | SQL, PDF, Excel, archivos | presentation |
+| infrastructure | TypeORM, persistencia PostgreSQL, PDF, Excel, archivos | presentation |
 | presentation | DTO, validación de formato, `execute` | reglas de negocio, SQL |
 
 ### Control de flujo
@@ -56,11 +56,15 @@ libs/
 
 ## 4. Datos
 
-- SQL Server. `synchronize: false`.
-- Migraciones numeradas, solo esquema, re-ejecutables (`IF NOT EXISTS`).
+- PostgreSQL es el único motor del ERP. SQL Server/LocalDB no forman parte del runtime, configuración, scripts ni dependencias.
+- TypeORM es obligatorio para persistencia relacional. Entidades y adapters viven en `libs/infrastructure`; cada repo compone sus consultas en `*.queries.ts` usando QueryBuilder y devuelve tipos de ports, nunca entities ORM.
+- `synchronize: false` y `migrationsRun: false` siempre. La aplicación no cambia el esquema al iniciar.
+- Las 20 migraciones SQL existentes y su ledger con checksum se conservan como historial aplicado. Las nuevas migraciones se escriben como `MigrationInterface` de TypeORM y se ejecutan solo mediante comando explícito.
+- El runner verifica base destino e historial, rechaza una base con tablas sin baseline, no reescribe migraciones aplicadas y no recrea tablas ya registradas. El bootstrap de base es independiente; `erp_owner` ejecuta DDL y `erp_app` opera con permisos de datos.
+- SQL explícito queda restringido a `libs/infrastructure/src/persistence/<repo>.queries.ts`, parametrizado y justificado cuando QueryBuilder no exprese claramente la operación.
 - Semillas de catálogo en scripts `seed:*` separados.
-- Fechas en `DATETIME2` UTC.
-- Toda clave de entidad y toda clave foránea hacia una entidad es `UNIQUEIDENTIFIER`. La aplicación genera el id con `crypto.randomUUID` antes del insert. El código de cuenta (por ejemplo `1.01.01.001`) es un código de negocio, no el id.
+- Fechas y horas en `timestamptz` UTC; fechas civiles en `date`.
+- Toda clave de entidad y toda clave foránea hacia una entidad es `uuid`. La aplicación genera el id con `crypto.randomUUID` antes del insert. El código de cuenta (por ejemplo `1.01.01.001`) es un código de negocio, no el id.
 - Parámetros en SQL. Nunca concatenar entrada del usuario.
 
 ## 5. Seguridad

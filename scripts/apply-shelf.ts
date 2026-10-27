@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { reclassifyShelf } from '@domain/inventory/shelf';
-import { loadEnvFile } from '@infrastructure/persistence/database-env';
-import { createMssqlExecutor } from '@infrastructure/persistence/mssql-executor';
+import { reclassifyShelf } from '@domain/inventory/stock/shelf/shelf';
+import { loadEnvFile } from '@infrastructure/shared/postgres/database-env';
+import { ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
+import { createTypeOrmExecutor } from '@infrastructure/shared/postgres/typeorm-executor';
 
 loadEnvFile(join(__dirname, '..', '.env'));
 
@@ -14,31 +14,19 @@ interface ProductShelfRow {
 }
 
 async function main(): Promise<void> {
-  const sql = readFileSync(join(__dirname, '..', 'migrations', '014_shelf_and_ledger.sql'), 'utf8');
-  const executor = createMssqlExecutor(process.env);
-  const changed = await executor.transaction(async (session) => {
-    await session.query(sql, {});
-    const rows = await session.query<ProductShelfRow>(
-      'SELECT id, name, category, supplier FROM dbo.products',
-      {},
-    );
+  const executor = createTypeOrmExecutor(process.env);
+  const changed = await executor.transaction(() => executor.withManager(async (manager) => {
+    const rows = await manager.getRepository(ProductEntity).createQueryBuilder('product')
+      .select('product.id', 'id').addSelect('product.name', 'name').addSelect('product.category', 'category')
+      .addSelect('product.supplier', 'supplier').getRawMany<ProductShelfRow>();
     const updates = shelfUpdates(rows);
-    if (updates.length === 0) {
-      return 0;
+    for (const update of updates) {
+      await manager.getRepository(ProductEntity).createQueryBuilder().update(ProductEntity)
+        .set({ category: update.category, supplier: update.supplier }).where('id = :id', { id: update.id }).execute();
     }
-    await session.query(
-      `UPDATE product
-       SET category = source.category, supplier = source.supplier
-       FROM dbo.products AS product
-       INNER JOIN OPENJSON(@rows) WITH (
-         id uniqueidentifier '$.id',
-         category nvarchar(100) '$.category',
-         supplier nvarchar(100) '$.supplier'
-       ) AS source ON source.id = product.id`,
-      { rows: JSON.stringify(updates) },
-    );
     return updates.length;
-  });
+  }));
+  await executor.close?.();
   process.stdout.write(`shelf-ready ${changed}\n`);
   process.exit(0);
 }

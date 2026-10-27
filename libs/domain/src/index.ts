@@ -7,7 +7,7 @@ export {
   resolveGatewayUpstream,
   type GatewayRoute,
   type ResolvedUpstream,
-} from '@domain/gateway/gateway-routes';
+} from '@domain/gateway/routing/gateway-routes';
 
 export {
   allocateIssue,
@@ -18,7 +18,7 @@ export {
   type CostingMethod,
   type CostLayer,
   type IssueAllocation,
-} from '@domain/inventory/costing';
+} from '@domain/inventory/catalog/costing/costing';
 
 export {
   createCompany,
@@ -27,4 +27,4 @@ export {
   type Society,
   type Tenant,
   type Warehouse,
-} from '@domain/tenancy/company';
+} from '@domain/tenancy/company/company';

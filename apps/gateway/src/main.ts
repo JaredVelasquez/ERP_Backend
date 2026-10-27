@@ -1,6 +1,6 @@
 import { join } from 'node:path';
-import { requireGatewayUpstreams } from '@domain/gateway/gateway-routes';
-import { loadEnvFile } from '@infrastructure/persistence/database-env';
+import { requireGatewayUpstreams } from '@domain/gateway/routing/gateway-routes';
+import { loadEnvFile } from '@infrastructure/shared/postgres/database-env';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { createGatewayProxy } from './gateway-proxy';

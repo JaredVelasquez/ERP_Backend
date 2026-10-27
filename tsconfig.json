@@ -21,7 +21,8 @@
       "@domain/*": ["./libs/domain/src/*"],
       "@application/*": ["./libs/application/src/*"],
       "@infrastructure/*": ["./libs/infrastructure/src/*"],
-      "@presentation/*": ["./libs/presentation/src/*"]
+      "@presentation/*": ["./libs/presentation/src/*"],
+      "@composition/*": ["./apps/modules/*"]
     }
   },
   "include": ["apps/**/*", "libs/**/*"],

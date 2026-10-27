@@ -19,17 +19,35 @@
     "dev:mcps": "nest start mcps --watch",
     "dev:gateway": "nest start gateway --watch",
     "dev": "concurrently -n identity,erp,mcps,gateway -c blue,green,yellow,magenta \"npm:dev:identity\" \"npm:dev:erp\" \"npm:dev:mcps\" \"npm:dev:gateway\"",
+    "migrate:postgres": "ts-node -r tsconfig-paths/register scripts/run-postgres-migrations.ts",
+    "db:ensure": "ts-node -r tsconfig-paths/register scripts/create-postgres-database.ts",
+    "db:status": "ts-node -r tsconfig-paths/register scripts/check-postgres-state.ts",
+    "storage:ensure-bucket": "ts-node -r tsconfig-paths/register scripts/ensure-s3-bucket.ts",
+    "smoke:auth-refresh": "ts-node -r tsconfig-paths/register scripts/smoke-refresh-session.ts",
+    "smoke:auth-http": "ts-node -r tsconfig-paths/register scripts/smoke-auth-http.ts",
+    "smoke:assistant-history": "ts-node -r tsconfig-paths/register scripts/smoke-assistant-history.ts",
+    "smoke:assistant-page": "ts-node -r tsconfig-paths/register scripts/smoke-assistant-page.ts",
+    "smoke:s3": "ts-node -r tsconfig-paths/register scripts/smoke-s3-storage.ts",
+    "smoke:postgres": "ts-node -r tsconfig-paths/register scripts/smoke-postgres.ts",
+    "smoke:postgres:write": "ts-node -r tsconfig-paths/register scripts/smoke-postgres-write.ts",
+    "smoke:import-idempotency": "ts-node -r tsconfig-paths/register scripts/smoke-import-idempotency.ts",
+    "smoke:auth-browser": "ts-node -r tsconfig-paths/register scripts/smoke-browser-refresh.ts",
+    "smoke:voucher-storage-http": "ts-node -r tsconfig-paths/register scripts/smoke-voucher-storage-http.ts",
+    "smoke:frontend-mobile-routes": "ts-node -r tsconfig-paths/register scripts/smoke-frontend-mobile-routes.ts",
     "lint": "eslint \"{apps,libs}/**/*.ts\" --max-warnings 0",
     "test": "jest"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1155.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "http-proxy-middleware": "^3.0.7",
-    "mssql": "^12.7.2",
+    "jose": "^6.2.13",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "typeorm": "^1.1.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
@@ -38,8 +56,8 @@
     "@nestjs/testing": "^11.0.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
-    "@types/mssql": "^12.3.0",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.23.1",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "concurrently": "^9.2.4",
@@ -69,7 +87,8 @@
       "^@domain/(.*)$": "<rootDir>/libs/domain/src/$1",
       "^@application/(.*)$": "<rootDir>/libs/application/src/$1",
       "^@infrastructure/(.*)$": "<rootDir>/libs/infrastructure/src/$1",
-      "^@presentation/(.*)$": "<rootDir>/libs/presentation/src/$1"
+      "^@presentation/(.*)$": "<rootDir>/libs/presentation/src/$1",
+      "^@composition/(.*)$": "<rootDir>/apps/modules/$1"
     }
   }
 }

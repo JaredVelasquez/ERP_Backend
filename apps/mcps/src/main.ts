@@ -1,15 +1,13 @@
 import { join } from 'node:path';
-import { loadEnvFile, missingDatabaseKeys } from '@infrastructure/persistence/database-env';
+import { loadEnvFile } from '@infrastructure/shared/postgres/database-env';
 import { NestFactory } from '@nestjs/core';
+import { json } from 'express';
 import { AppModule } from './app.module';
 
 loadEnvFile(join(process.cwd(), '.env'));
-if (missingDatabaseKeys(process.env).length === 0) {
-  process.env.IDENTITY_STORE = 'sql';
-}
-
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(json({ limit: '8mb' }));
   await app.listen(readPort(process.env.MCPS_PORT, 3003));
 }
 

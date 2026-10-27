@@ -1,11 +1,9 @@
-import { gatewayAllows, readSessionToken } from '@domain/identity/access';
-import { resolveGatewayUpstream } from '@domain/gateway/gateway-routes';
+import { gatewayAllows, readSessionToken } from '@domain/identity/membership/access';
+import { resolveGatewayUpstream } from '@domain/gateway/routing/gateway-routes';
 import type { RequestHandler } from 'express';
 import { createProxyMiddleware, type RequestHandler as ProxyHandler } from 'http-proxy-middleware';
 
 const proxies = new Map<string, ProxyHandler>();
-
-const LOCAL_FRONTEND = new Set(['http://127.0.0.1:5174', 'http://localhost:5174']);
 
 export function createGatewayProxy(): RequestHandler {
   return (request, response, next) => {
@@ -32,7 +30,7 @@ export function createGatewayProxy(): RequestHandler {
 
 function allowLocalFrontend(request: { headers: { origin?: string } }, response: { setHeader(name: string, value: string): void }): void {
   const origin = request.headers.origin;
-  if (origin === undefined || !LOCAL_FRONTEND.has(origin)) {
+  if (origin === undefined || !allowedWebOrigins().has(origin)) {
     return;
   }
   response.setHeader('Access-Control-Allow-Origin', origin);
@@ -53,7 +51,7 @@ function proxyFor(upstream: string): ProxyHandler {
     on: {
       proxyRes(proxyRes, req) {
         const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
-        if (!LOCAL_FRONTEND.has(origin)) {
+        if (!allowedWebOrigins().has(origin)) {
           return;
         }
         proxyRes.headers['access-control-allow-origin'] = origin;
@@ -63,4 +61,12 @@ function proxyFor(upstream: string): ProxyHandler {
   });
   proxies.set(upstream, created);
   return created;
+}
+
+function allowedWebOrigins(): Set<string> {
+  const configured = process.env.WEB_ORIGINS;
+  if (configured === undefined || configured.trim() === '') {
+    return new Set(['http://127.0.0.1:5174', 'http://localhost:5174', 'http://127.0.0.1:5175', 'http://localhost:5175']);
+  }
+  return new Set(configured.split(',').map((origin) => origin.trim()).filter(Boolean));
 }

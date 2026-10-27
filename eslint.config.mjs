@@ -37,6 +37,16 @@ const presentationModuleBlock = {
   rules: { 'no-restricted-imports': layerRule('presentation', ['@infrastructure/']) },
 };
 
+const presentationDatabaseBlock = {
+  files: ['libs/presentation/src/**/*.ts'],
+  rules: {
+    'no-restricted-syntax': [
+      'error',
+      { selector: 'CallExpression[callee.property.name="query"]', message: 'Presentation cannot execute database queries.' },
+    ],
+  },
+};
+
 export default [
   eslint.configs.recommended,
   {
@@ -68,8 +78,16 @@ export default [
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'error',
+      'no-restricted-syntax': [
+        'error',
+        { selector: 'IfStatement[alternate]', message: 'Use early return or early throw instead of else.' },
+        { selector: 'IfStatement IfStatement', message: 'Extract nested conditions into a named function.' },
+        { selector: 'Property[key.name="synchronize"][value.value=true]', message: 'TypeORM schema synchronization is forbidden.' },
+        { selector: 'Property[key.name="migrationsRun"][value.value=true]', message: 'Automatic TypeORM migrations are forbidden.' },
+      ],
     },
   },
   ...layerBlocks,
   presentationModuleBlock,
+  presentationDatabaseBlock,
 ];

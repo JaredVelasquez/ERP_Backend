@@ -1,186 +1,99 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ACCOUNT_CODE_REMAP, CHART_OF_ACCOUNTS, type AccountSeed } from '@domain/accounting/chart';
-import { loadEnvFile } from '@infrastructure/persistence/database-env';
-import { createMssqlExecutor } from '@infrastructure/persistence/mssql-executor';
-import type { SqlSession } from '@infrastructure/persistence/sql-executor';
+import { ACCOUNT_CODE_REMAP, CHART_OF_ACCOUNTS, type AccountSeed } from '@domain/accounting/account/chart';
+import { AccountEntity, PostingRuleEntity } from '@infrastructure/accounting/account/postgres/entities/chart.entity';
+import { InventoryJournalLineEntity } from '@infrastructure/inventory/ledger/postgres/entities/inventory-ledger.entity';
+import { loadEnvFile } from '@infrastructure/shared/postgres/database-env';
+import { createTypeOrmExecutor } from '@infrastructure/shared/postgres/typeorm-executor';
+import type { EntityManager } from 'typeorm';
 
 loadEnvFile(join(__dirname, '..', '.env'));
 
-type IdRow = { id: string };
-type CompanyRow = { companyId: string };
-type CountRow = { total: number };
-
-interface ChartInsert {
-  id: string;
-  companyId: string;
-  code: string;
-  name: string;
-  kind: AccountSeed['kind'];
-  postable: boolean;
-  collection: boolean;
-}
-
 async function main(): Promise<void> {
-  const executor = createMssqlExecutor(process.env);
-  const widthSql = readFileSync(join(__dirname, '..', 'migrations', '012_account_code_width.sql'), 'utf8');
-  await executor.transaction(async (session) => {
-    await session.query(widthSql, {});
-    return [];
-  });
-  const summary = await executor.transaction(async (session) => applyChart(session));
-  process.stdout.write(`${JSON.stringify(summary)}\n`);
-  process.exit(0);
+  const executor = createTypeOrmExecutor(process.env);
+  try {
+    const summary = await executor.transaction(() => executor.withManager(applyChart));
+    process.stdout.write(`${JSON.stringify(summary)}\n`);
+  } finally {
+    await executor.close?.();
+  }
 }
 
-async function applyChart(session: SqlSession): Promise<Record<string, number>> {
-  const pairs = pairPayload();
-  const remapped = await remapLeaves(session, pairs);
-  const companies = await session.query<CompanyRow>(
-    'SELECT DISTINCT company_id AS companyId FROM dbo.accounts',
-    {},
-  );
-  const inserted = await insertMissing(session, companies.map((row) => row.companyId));
-  const debitRules = await remapRuleColumn(session, 'debit_code', pairs);
-  const creditRules = await remapRuleColumn(session, 'credit_code', pairs);
-  const lines = await remapJournalCodes(session, pairs);
-  const leftover = await countOldCodes(session, pairs);
+async function applyChart(manager: EntityManager): Promise<Record<string, number>> {
+  const remapped = await remapLeaves(manager);
+  const companies = await manager.getRepository(AccountEntity).createQueryBuilder('account').select('account.companyId', 'companyId')
+    .distinct(true).getRawMany<{ companyId: string }>();
+  const companyIds = companies.map((row) => row.companyId);
+  const inserted = await insertMissing(manager, companyIds);
+  const debitRules = await remapRuleColumn(manager, 'debitCode');
+  const creditRules = await remapRuleColumn(manager, 'creditCode');
+  const lines = await remapJournalCodes(manager);
+  const leftover = await countOldCodes(manager);
   return { remapped, inserted, debitRules, creditRules, lines, leftover };
 }
 
-async function remapLeaves(session: SqlSession, pairs: string): Promise<number> {
-  const rows = await session.query<IdRow>(`
-    UPDATE account_row
-    SET account_row.code = mapped.[next],
-        account_row.name = mapped.name,
-        account_row.postable = 1
-    OUTPUT inserted.id
-    FROM dbo.accounts AS account_row
-    INNER JOIN OPENJSON(@pairs) WITH (
-      previous NVARCHAR(32) '$.previous',
-      [next] NVARCHAR(32) '$.next',
-      name NVARCHAR(200) '$.name'
-    ) AS mapped ON account_row.code = mapped.previous
-  `, { pairs });
-  return rows.length;
-}
-
-async function insertMissing(session: SqlSession, companyIds: readonly string[]): Promise<number> {
-  const rows = await session.query<IdRow>(`
-    INSERT INTO dbo.accounts (id, company_id, code, name, kind, postable, is_collection)
-    OUTPUT inserted.id
-    SELECT row.id, row.companyId, row.code, row.name, row.kind, row.postable, row.collection
-    FROM OPENJSON(@rows) WITH (
-      id UNIQUEIDENTIFIER '$.id',
-      companyId UNIQUEIDENTIFIER '$.companyId',
-      code NVARCHAR(32) '$.code',
-      name NVARCHAR(200) '$.name',
-      kind NVARCHAR(20) '$.kind',
-      postable BIT '$.postable',
-      collection BIT '$.collection'
-    ) AS row
-    WHERE NOT EXISTS (
-      SELECT 1
-      FROM dbo.accounts AS current_row
-      WHERE current_row.company_id = row.companyId AND current_row.code = row.code
-    )
-  `, { rows: JSON.stringify(rowsForCompanies(companyIds)) });
-  return rows.length;
-}
-
-async function remapRuleColumn(session: SqlSession, columnName: 'debit_code' | 'credit_code', pairs: string): Promise<number> {
-  if (columnName === 'credit_code') {
-    return countUpdated(await session.query<IdRow>(creditRuleSql(), { pairs }));
-  }
-  return countUpdated(await session.query<IdRow>(debitRuleSql(), { pairs }));
-}
-
-function debitRuleSql(): string {
-  return `
-    UPDATE target_row
-    SET target_row.debit_code = mapped.[next]
-    OUTPUT inserted.id
-    FROM dbo.posting_rules AS target_row
-    INNER JOIN OPENJSON(@pairs) WITH (
-      previous NVARCHAR(32) '$.previous',
-      [next] NVARCHAR(32) '$.next'
-    ) AS mapped ON target_row.debit_code = mapped.previous
-  `;
-}
-
-function creditRuleSql(): string {
-  return `
-    UPDATE target_row
-    SET target_row.credit_code = mapped.[next]
-    OUTPUT inserted.id
-    FROM dbo.posting_rules AS target_row
-    INNER JOIN OPENJSON(@pairs) WITH (
-      previous NVARCHAR(32) '$.previous',
-      [next] NVARCHAR(32) '$.next'
-    ) AS mapped ON target_row.credit_code = mapped.previous
-  `;
-}
-
-async function remapJournalCodes(session: SqlSession, pairs: string): Promise<number> {
-  const rows = await session.query<IdRow>(`
-    UPDATE target_row
-    SET target_row.account_code = mapped.[next]
-    OUTPUT inserted.id
-    FROM dbo.journal_lines AS target_row
-    INNER JOIN OPENJSON(@pairs) WITH (
-      previous NVARCHAR(32) '$.previous',
-      [next] NVARCHAR(32) '$.next'
-    ) AS mapped ON target_row.account_code = mapped.previous
-  `, { pairs });
-  return rows.length;
-}
-
-function countUpdated(rows: readonly IdRow[]): number {
-  return rows.length;
-}
-
-async function countOldCodes(session: SqlSession, pairs: string): Promise<number> {
-  const rows = await session.query<CountRow>(`
-    SELECT COUNT(*) AS total
-    FROM dbo.accounts AS account_row
-    WHERE account_row.code IN (
-      SELECT mapped.previous
-      FROM OPENJSON(@pairs) WITH (previous NVARCHAR(32) '$.previous') AS mapped
-    )
-  `, { pairs });
-  return rows[0]?.total ?? 0;
-}
-
-function pairPayload(): string {
+async function remapLeaves(manager: EntityManager): Promise<number> {
   const names = new Map(CHART_OF_ACCOUNTS.map((account) => [account.code, account.name]));
-  return JSON.stringify(ACCOUNT_CODE_REMAP.map((pair) => ({
-    previous: pair.previous,
-    next: pair.next,
-    name: names.get(pair.next) ?? pair.next,
-  })));
+  let changed = 0;
+  for (const pair of ACCOUNT_CODE_REMAP) {
+    const result = await manager.getRepository(AccountEntity).createQueryBuilder().update(AccountEntity)
+      .set({ code: pair.next, name: names.get(pair.next) ?? pair.next, postable: true })
+      .where('code = :previous', { previous: pair.previous }).execute();
+    changed += result.affected ?? 0;
+  }
+  return changed;
 }
 
-function rowsForCompanies(companyIds: readonly string[]): ChartInsert[] {
-  const rows: ChartInsert[] = [];
+async function insertMissing(manager: EntityManager, companyIds: readonly string[]): Promise<number> {
+  let inserted = 0;
   for (const companyId of companyIds) {
-    appendSeeds(rows, companyId);
+    for (const seed of CHART_OF_ACCOUNTS) inserted += await insertSeedIfMissing(manager, companyId, seed);
   }
-  return rows;
+  return inserted;
 }
 
-function appendSeeds(rows: ChartInsert[], companyId: string): void {
-  for (const seed of CHART_OF_ACCOUNTS) {
-    rows.push({
-      id: randomUUID(),
-      companyId,
-      code: seed.code,
-      name: seed.name,
-      kind: seed.kind,
-      postable: seed.postable,
-      collection: seed.collection,
-    });
-  }
+async function insertSeedIfMissing(manager: EntityManager, companyId: string, seed: AccountSeed): Promise<number> {
+  const found = await manager.getRepository(AccountEntity).createQueryBuilder('account').select('account.id', 'id')
+    .where('account.companyId = :companyId AND account.code = :code', { companyId, code: seed.code }).getRawOne<{ id: string }>();
+  if (found) return 0;
+  await manager.getRepository(AccountEntity).createQueryBuilder().insert().values({
+    id: randomUUID(), companyId, code: seed.code, name: seed.name, kind: seed.kind,
+    postable: seed.postable, isCollection: seed.collection,
+  }).execute();
+  return 1;
 }
 
-void main();
+async function remapRuleColumn(manager: EntityManager, column: 'debitCode' | 'creditCode'): Promise<number> {
+  let changed = 0;
+  for (const pair of ACCOUNT_CODE_REMAP) {
+    const result = await updateRuleCode(manager, column, pair.previous, pair.next);
+    changed += result;
+  }
+  return changed;
+}
+
+async function updateRuleCode(manager: EntityManager, column: 'debitCode' | 'creditCode', previous: string, next: string): Promise<number> {
+  const result = await manager.getRepository(PostingRuleEntity).createQueryBuilder().update(PostingRuleEntity)
+    .set({ [column]: next }).where(`${column} = :previous`, { previous }).execute();
+  return result.affected ?? 0;
+}
+
+async function remapJournalCodes(manager: EntityManager): Promise<number> {
+  let changed = 0;
+  for (const pair of ACCOUNT_CODE_REMAP) {
+    const result = await manager.getRepository(InventoryJournalLineEntity).createQueryBuilder().update(InventoryJournalLineEntity)
+      .set({ accountCode: pair.next }).where('accountCode = :previous', { previous: pair.previous }).execute();
+    changed += result.affected ?? 0;
+  }
+  return changed;
+}
+
+async function countOldCodes(manager: EntityManager): Promise<number> {
+  return manager.getRepository(AccountEntity).createQueryBuilder('account')
+    .where('account.code IN (:...codes)', { codes: ACCOUNT_CODE_REMAP.map((pair) => pair.previous) }).getCount();
+}
+
+void main().catch((error: unknown) => {
+  process.stderr.write(`${error instanceof Error ? error.message : 'Account code remap failed'}\n`);
+  process.exitCode = 1;
+});
