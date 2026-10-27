@@ -36,6 +36,18 @@
 5. **Reportes de periodo:** libros y reportes fiscales/contables derivados de documentos emitidos y asientos; exportación y comparativos de periodos.
 6. **Conciliación bancaria:** fase posterior, una vez acordados formatos de extracto, reglas de coincidencia y tratamiento de diferencias.
 
+### Precisión, redondeo y visualización
+
+- La precisión de captura/cálculo y los decimales visibles son configuraciones distintas. Mostrar 4 decimales no recupera precisión que ya se redondeó y almacenó a 2.
+- Configurar por empresa y por tipo de dato: cantidades y factores de presentación; costos unitarios; precios unitarios; importes de línea/totales; tasas/impuestos; y partidas contables. Cada tipo tiene una escala máxima respaldada por la base, y el usuario autorizado elige la precisión dentro de ese límite.
+- Definir por contexto los decimales mínimos/máximos de visualización: operación, precios, reportes, contabilidad y comprobantes fiscales. Los reportes pueden mostrar 2 decimales aunque usen saldos internos más precisos.
+- La emisión fiscal aplica exclusivamente la precisión, redondeo y forma de presentación aprobados para el documento y régimen configurados. El formato de reportes o la preferencia visual de un usuario nunca modifica el documento emitido.
+- Evitar redondear el costo unitario antes de multiplicarlo por cantidad. Persistir escalas suficientes para reproducir cálculos y snapshots; establecer por escrito en qué etapa se redondea cada importe, cómo se distribuyen diferencias y cómo se garantiza que debe/haber cuadren.
+- Los cambios de escala/configuración rigen hacia adelante. No reescriben capas, asientos, documentos ni reportes históricos ya confirmados.
+- Propuesta inicial para validar: captura de cantidades, factores, costo/precio unitario con hasta 4 decimales; presentación contable compacta de 2 decimales; escala de emisión fiscal según el régimen. No convertir esta propuesta en semilla sin aprobación contable/fiscal.
+
+La implementación requiere migrar los valores monetarios actualmente restringidos a escala 2, sustituir los redondeos globales fijos por políticas tipadas y unificar los formateadores del frontend. Las migraciones serán aditivas y conservarán los valores existentes; no se recalculará historia silenciosamente.
+
 ## Orden de implementación
 
 | Orden | Entregable | Depende de |
@@ -68,11 +80,13 @@ La [página de facturación del SAR](https://www.sar.gob.hn/facturacion/) indica
 2. **Documentos de venta:** tipos requeridos para cada caso de venta y si la empresa emitirá desde el ERP o registrará documentos generados con su mecanismo autorizado actual.
 3. **Comportamiento cuando no se puede emitir:** bloquear la confirmación de la venta hasta tener documento, o permitir una venta pendiente controlada que no se considere fiscalmente completada. Debe aprobarlo el responsable fiscal.
 4. **Contabilidad:** aprobar cuentas y reglas para ventas, costo de ventas, impuestos, compras, devoluciones y cierres; confirmar prioridad entre cierres contables y conciliación bancaria.
+5. **Decimales:** confirmar escalas de captura/cálculo para cantidades, factores, costo y precio unitario, importes contables y tasas; aprobar la política de redondeo por etapa y la presentación fiscal.
 
 ## Criterios de aceptación de fase
 
 - Ninguna venta fiscalmente obligada se completa sin el documento aplicable o excepción autorizada y auditada.
 - Ningún ajuste/merma/entrada inicial exige una factura de venta; todo movimiento queda identificado con actor, motivo, fecha y documento operativo.
 - Reintentos no duplican documentos, movimientos, capas, impuestos ni asientos.
+- Una precisión operativa mayor no introduce diferencias ocultas entre documento, inventario y partida contable; el redondeo aplicado queda reproducible y auditable.
 - Reportes concilian ventas, documentos fiscales, impuestos, inventario y libros; cada total se puede rastrear hasta el origen.
 - Pruebas de permisos, aislamiento por empresa, anulaciones, devoluciones, periodos bloqueados, fallas externas y recuperación pasan antes de habilitar producción.

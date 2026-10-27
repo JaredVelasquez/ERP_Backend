@@ -486,3 +486,9 @@ Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión f
 - **Deps:** T-046.
 - **Hacer:** importar extractos en un formato acordado, sugerir coincidencias y dejar ajustes manuales trazables.
 - **Listo cuando:** el saldo conciliado concuerda con el extracto y diferencias no crean asientos duplicados.
+## T-050 — Precisión numérica y formato decimal por contexto
+- **Estado:** [ ] propuesto para fase 2; falta aprobar escalas y redondeos con Contabilidad y responsable fiscal.
+- **Deps:** T-041, T-043.
+- **Hacer:** separar precisión de captura/cálculo de visualización; definir políticas tipadas para cantidad, factor, costo/precio unitario, importes de línea, impuesto y partidas; migrar columnas de escala 2 sin pérdida ni recálculo silencioso; unificar formateadores operativos, reportes, contabilidad y documentos fiscales.
+- **Propuesta inicial:** hasta 4 decimales en captura/cálculo de cantidades y valores unitarios; reportes contables pueden mostrar 2; documentos fiscales siguen la regla aprobada del régimen.
+- **Listo cuando:** los mismos valores de origen producen cálculos y redondeos reproducibles; las partidas cuadran; cambiar el formato visible no altera almacenamiento ni contabilidad; el histórico conserva sus valores.
