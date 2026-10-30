@@ -38,6 +38,28 @@ export async function chooseDefaultWarehouse(manager: EntityManager, companyId: 
   if (!result.affected) throw new Error('Warehouse was not found');
 }
 
+export async function renameWarehouse(manager: EntityManager, companyId: string, warehouseId: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (trimmed === '') throw new Error('Warehouse name is required');
+  const result = await manager.createQueryBuilder().update(WarehouseEntity).set({ name: trimmed })
+    .where('companyId = :companyId AND id = :warehouseId', { companyId, warehouseId }).execute();
+  if (!result.affected) throw new Error('Warehouse was not found');
+}
+
+export async function setWarehouseActive(manager: EntityManager, companyId: string, warehouseId: string, active: boolean): Promise<void> {
+  await assertCanDeactivate(manager, companyId, warehouseId, active);
+  const result = await manager.createQueryBuilder().update(WarehouseEntity).set({ active })
+    .where('companyId = :companyId AND id = :warehouseId', { companyId, warehouseId }).execute();
+  if (!result.affected) throw new Error('Warehouse was not found');
+}
+
+async function assertCanDeactivate(manager: EntityManager, companyId: string, warehouseId: string, active: boolean): Promise<void> {
+  if (active) return;
+  const warehouse = await manager.createQueryBuilder(WarehouseEntity, 'warehouse')
+    .where('warehouse.companyId = :companyId AND warehouse.id = :warehouseId', { companyId, warehouseId }).getOne();
+  if (warehouse?.isDefault) throw new Error('Cannot deactivate the default warehouse');
+}
+
 export async function insertPeriod(manager: EntityManager, companyId: string, period: AccountingPeriod): Promise<void> {
   await manager.createQueryBuilder().insert().into(AccountingPeriodEntity).values({ ...period, companyId, closedBy: null, reopenedBy: null }).execute();
 }

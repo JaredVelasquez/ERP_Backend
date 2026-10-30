@@ -26,6 +26,14 @@ describe('TypeORM company repository queries', () => {
     expect(orm.insertedEntities).toEqual([CompanyEntity, WarehouseEntity]);
   });
 
+  it('inserts a new warehouse for an existing company without opening a transaction', async () => {
+    const orm = new RecordingExecutor();
+    await new PostgresCompanyRepository(orm).createWarehouse({ id: 'warehouse-2', companyId: company.id, name: 'Bodega 2', code: 'BOD-002', active: true, isDefault: false });
+
+    expect(orm.transactionCount).toBe(0);
+    expect(orm.insertedEntities).toEqual([WarehouseEntity]);
+  });
+
   it('does not insert a warehouse when the company insert fails', async () => {
     const orm = new RecordingExecutor(CompanyEntity);
     await expect(new PostgresCompanyRepository(orm).insertCompanyWithWarehouse(company, warehouse)).rejects.toThrow('insert failed');

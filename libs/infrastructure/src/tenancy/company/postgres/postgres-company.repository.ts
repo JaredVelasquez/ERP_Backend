@@ -44,6 +44,10 @@ export class PostgresCompanyRepository implements CompanyPort {
   listWarehouses(companyId: string): Promise<Warehouse[]> {
     return this.orm.withManager((manager) => selectWarehouses(manager, companyId));
   }
+
+  async createWarehouse(warehouse: Warehouse): Promise<void> {
+    await this.orm.withManager((manager) => insertWarehouse(manager, warehouse));
+  }
 }
 
 function mapCompany(row: CompanyQueryRow): Company {

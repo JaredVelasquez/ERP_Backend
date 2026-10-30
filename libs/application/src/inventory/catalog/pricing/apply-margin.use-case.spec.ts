@@ -67,6 +67,8 @@ class MemoryCompanies implements CompanyPort {
   async findCompany(): Promise<Company | null> {
     return this.company;
   }
+
+  async createWarehouse(_warehouse: Warehouse): Promise<void> {}
 }
 
 describe('apply margin', () => {

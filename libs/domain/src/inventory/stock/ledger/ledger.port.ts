@@ -5,7 +5,7 @@ export interface ConfirmedDocument {
   id: string;
   companyId: string;
   warehouseId?: string;
-  type: DocumentKind | 'void';
+  type: DocumentKind | 'void' | 'warehouse-transfer';
   status: 'confirmed' | 'voided';
   idempotencyKey: string;
   occurredAt: string;

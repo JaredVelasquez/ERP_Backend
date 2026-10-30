@@ -55,6 +55,20 @@ export class CompanyControlsController {
     return { accepted: true };
   }
 
+  @Put('warehouses/:id')
+  async renameWarehouse(@Req() request: Request, @Param('id') id: string, @Body() body: { name: string }) {
+    const session = await requireCompanySession(this.identity, request.headers);
+    await this.manageControls.renameWarehouse(session.companyId, id, body.name);
+    return { accepted: true };
+  }
+
+  @Put('warehouses/:id/active')
+  async warehouseActive(@Req() request: Request, @Param('id') id: string, @Body() body: { active: boolean }) {
+    const session = await requireCompanySession(this.identity, request.headers);
+    await this.manageControls.setWarehouseActive(session.companyId, id, body.active);
+    return { accepted: true };
+  }
+
   @Post('periods')
   async createPeriod(@Req() request: Request, @Body() body: { name: string; startsOn: string; endsOn: string }) {
     const session = await requireCompanySession(this.identity, request.headers);

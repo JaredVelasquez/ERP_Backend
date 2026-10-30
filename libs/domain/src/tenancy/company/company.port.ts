@@ -7,6 +7,7 @@ export interface CompanyPort {
   listCompanies(societyId: string): Promise<Company[]>;
   listWarehouses(companyId: string): Promise<Warehouse[]>;
   findCompany(companyId: string): Promise<Company | null>;
+  createWarehouse(warehouse: Warehouse): Promise<void>;
 }
 
 export const COMPANY_PORT = Symbol('COMPANY_PORT');

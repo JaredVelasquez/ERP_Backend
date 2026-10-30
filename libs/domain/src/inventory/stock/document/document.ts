@@ -56,6 +56,7 @@ export interface JournalLine {
   accountCode: string;
   debit: number;
   credit: number;
+  costCenter?: string;
 }
 
 export interface LayerEffect {

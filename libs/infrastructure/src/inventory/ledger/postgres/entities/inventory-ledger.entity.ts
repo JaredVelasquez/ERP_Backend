@@ -64,4 +64,5 @@ export class InventoryJournalLineEntity {
   @Column('varchar', { name: 'account_code', length: 32 }) declare accountCode: string;
   @Column('numeric', { precision: 18, scale: 2 }) declare debit: string;
   @Column('numeric', { precision: 18, scale: 2 }) declare credit: string;
+  @Column('varchar', { name: 'cost_center', length: 20, nullable: true }) declare costCenter: string | null;
 }

@@ -5,6 +5,8 @@ export interface CompanyControlsPort {
   save(companyId: string, actorId: string, input: SaveCompanyControls): Promise<void>;
   createWarehouse(companyId: string, warehouse: WarehouseControl): Promise<void>;
   setDefaultWarehouse(companyId: string, warehouseId: string): Promise<void>;
+  renameWarehouse(companyId: string, warehouseId: string, name: string): Promise<void>;
+  setWarehouseActive(companyId: string, warehouseId: string, active: boolean): Promise<void>;
   createPeriod(companyId: string, period: AccountingPeriod): Promise<void>;
   setPeriodStatus(companyId: string, periodId: string, status: 'open' | 'closed', actorId: string, reason: string | null): Promise<void>;
   importBankLine(companyId: string, actorId: string, line: BankStatementLine): Promise<void>;

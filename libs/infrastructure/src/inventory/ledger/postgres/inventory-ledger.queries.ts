@@ -18,7 +18,7 @@ interface EffectRow {
   documentId: string; productId: string; layerId: string; quantityDelta: unknown; unitCost: unknown;
   receivedAt: Date | string; expiresOn: string | null;
 }
-interface JournalRow { documentId: string; accountCode: string; debit: unknown; credit: unknown }
+interface JournalRow { documentId: string; accountCode: string; debit: unknown; credit: unknown; costCenter: string | null }
 interface LayerRow {
   id: string; productId: string; receivedAt: Date | string; expiresOn: string | null; quantity: unknown; unitCost: unknown;
 }
@@ -140,7 +140,7 @@ async function readJournals(manager: EntityManager, companyId: string, documentI
     .innerJoin(InventoryJournalEntryEntity, 'entry', 'entry.id = line.entryId')
     .innerJoin(InventoryDocumentEntity, 'document', 'document.id = entry.documentId')
     .select('entry.documentId', 'documentId').addSelect('line.accountCode', 'accountCode')
-    .addSelect('line.debit', 'debit').addSelect('line.credit', 'credit')
+    .addSelect('line.debit', 'debit').addSelect('line.credit', 'credit').addSelect('line.costCenter', 'costCenter')
     .where('document.companyId = :companyId', { companyId }).andWhere('entry.documentId IN (:...documentIds)', { documentIds })
     .getRawMany<JournalRow>();
 }
@@ -196,7 +196,7 @@ async function insertJournals(manager: EntityManager, document: ConfirmedDocumen
     const entryId = randomUUID();
     entries.push(Object.assign(new InventoryJournalEntryEntity(), { id: entryId, companyId: document.companyId, documentId: document.id, createdAt: new Date(document.occurredAt) }));
     for (const line of group) journalLines.push(Object.assign(new InventoryJournalLineEntity(), {
-      id: randomUUID(), entryId, accountCode: line.accountCode, debit: line.debit, credit: line.credit,
+      id: randomUUID(), entryId, accountCode: line.accountCode, debit: line.debit, credit: line.credit, costCenter: line.costCenter ?? null,
     }));
   }
   await manager.getRepository(InventoryJournalEntryEntity).createQueryBuilder().insert().values(entries).execute();
@@ -205,13 +205,24 @@ async function insertJournals(manager: EntityManager, document: ConfirmedDocumen
 
 async function replaceStock(manager: EntityManager, change: LedgerCommit): Promise<void> {
   if (change.stock.length === 0) return;
-  const productIds = change.stock.map((row) => row.productId);
-  await manager.getRepository(CostLayerEntity).createQueryBuilder().delete()
-    .where('companyId = :companyId AND warehouseId = :warehouseId AND productId IN (:...productIds)', { companyId: change.document.companyId, warehouseId: change.document.warehouseId, productIds }).execute();
+  const productIdsByWarehouse = new Map<string, Set<string>>();
+  for (const row of change.stock) {
+    const warehouseId = row.warehouseId ?? change.document.warehouseId ?? '';
+    const productIds = productIdsByWarehouse.get(warehouseId) ?? new Set<string>();
+    productIds.add(row.productId);
+    productIdsByWarehouse.set(warehouseId, productIds);
+  }
+  for (const [warehouseId, productIds] of productIdsByWarehouse) {
+    await manager.getRepository(CostLayerEntity).createQueryBuilder().delete()
+      .where('companyId = :companyId AND warehouseId = :warehouseId AND productId IN (:...productIds)', {
+        companyId: change.document.companyId, warehouseId, productIds: [...productIds],
+      }).execute();
+  }
   const layers: CostLayerEntity[] = [];
   for (const row of change.stock) {
+    const warehouseId = row.warehouseId ?? change.document.warehouseId ?? '';
     for (const layer of row.layers) layers.push(Object.assign(new CostLayerEntity(), {
-      id: layer.id, companyId: row.companyId, warehouseId: row.warehouseId, productId: row.productId, receivedAt: new Date(layer.receivedAt),
+      id: layer.id, companyId: row.companyId, warehouseId, productId: row.productId, receivedAt: new Date(layer.receivedAt),
       expiresOn: layer.expiresOn, quantity: String(layer.quantity), unitCost: String(layer.unitCost),
     }));
   }
@@ -232,7 +243,7 @@ function assemble(header: HeaderRow, lines: readonly LineRow[], effects: readonl
   return {
     id: header.id, companyId: header.companyId, warehouseId: header.warehouseId, type: asDocumentType(header.documentType), status: asStatus(header.status),
     idempotencyKey: header.idempotencyKey, occurredAt: dateText(header.occurredAt ?? header.createdAt),
-    journal: journals.map((row) => ({ accountCode: row.accountCode, debit: decimal(row.debit), credit: decimal(row.credit) })),
+    journal: journals.map((row) => ({ accountCode: row.accountCode, debit: decimal(row.debit), credit: decimal(row.credit), costCenter: row.costCenter ?? undefined })),
     effects: effects.map((row) => ({
       productId: row.productId, layerId: row.layerId, quantityDelta: decimal(row.quantityDelta), unitCost: decimal(row.unitCost),
       receivedAt: dateText(row.receivedAt), expiresOn: blankToNull(row.expiresOn),
@@ -289,7 +300,7 @@ function blankToNull(value: string | null): string | null {
 }
 
 function asDocumentType(value: string): ConfirmedDocument['type'] {
-  if (value === 'purchase' || value === 'opening' || value === 'sale' || value === 'shrinkage' || value === 'adjustment' || value === 'cash-transfer' || value === 'void') return value;
+  if (value === 'purchase' || value === 'opening' || value === 'sale' || value === 'shrinkage' || value === 'adjustment' || value === 'cash-transfer' || value === 'warehouse-transfer' || value === 'void') return value;
   throw new DocumentError('Document was not found');
 }
 

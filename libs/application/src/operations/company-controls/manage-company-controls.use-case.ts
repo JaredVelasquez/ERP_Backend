@@ -20,6 +20,14 @@ export class ManageCompanyControlsUseCase {
     return this.controls.setDefaultWarehouse(companyId, warehouseId);
   }
 
+  renameWarehouse(companyId: string, warehouseId: string, name: string): Promise<void> {
+    return this.controls.renameWarehouse(companyId, warehouseId, name);
+  }
+
+  setWarehouseActive(companyId: string, warehouseId: string, active: boolean): Promise<void> {
+    return this.controls.setWarehouseActive(companyId, warehouseId, active);
+  }
+
   createPeriod(companyId: string, input: { name: string; startsOn: string; endsOn: string }): Promise<void> {
     return this.controls.createPeriod(companyId, { id: randomUUID(), ...input, status: 'open', closedAt: null, reopenedAt: null, reopenReason: null });
   }

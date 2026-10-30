@@ -34,4 +34,8 @@ export class InMemoryCompanyRepository implements CompanyPort {
   async listWarehouses(companyId: string): Promise<Warehouse[]> {
     return this.warehouses.filter((warehouse) => warehouse.companyId === companyId).map((warehouse) => ({ ...warehouse }));
   }
+
+  async createWarehouse(warehouse: Warehouse): Promise<void> {
+    this.warehouses.push({ ...warehouse });
+  }
 }

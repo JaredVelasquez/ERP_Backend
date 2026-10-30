@@ -37,6 +37,10 @@ class MemoryCompanyPort implements CompanyPort {
   async listWarehouses(companyId: string): Promise<Warehouse[]> {
     return this.warehouses.filter((warehouse) => warehouse.companyId === companyId);
   }
+
+  async createWarehouse(warehouse: Warehouse): Promise<void> {
+    this.warehouses.push(warehouse);
+  }
 }
 
 describe('company tenancy', () => {
