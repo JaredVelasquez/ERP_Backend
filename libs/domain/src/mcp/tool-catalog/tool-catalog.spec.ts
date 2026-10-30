@@ -17,7 +17,7 @@ describe('mcp tool catalog', () => {
 
     expect(findMcpTool('post-entry')?.module).toBe('accounting');
     expect(findMcpTool('missing')).toBeNull();
-    expect(MCP_TOOL_CATALOG).toHaveLength(54);
+    expect(MCP_TOOL_CATALOG).toHaveLength(55);
     expect(findMcpTool('issue-stock')?.access).toBe('edit');
     expect(findMcpTool('render-barcode-sheet')?.access).toBe('view');
     expect(hashMcpToken(token)).not.toContain(token);

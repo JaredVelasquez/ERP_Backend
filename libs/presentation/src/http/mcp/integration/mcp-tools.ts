@@ -20,6 +20,7 @@ import { DashboardUseCase } from '@application/inventory/stock/dashboard/dashboa
 import { ImportCatalogUseCase } from '@application/inventory/catalog/import/import-catalog.use-case';
 import { ImportCountUseCase } from '@application/inventory/catalog/import/import-count.use-case';
 import { IssueStockUseCase } from '@application/inventory/stock/issue/issue-stock.use-case';
+import { TransferStockUseCase } from '@application/inventory/stock/transfer/transfer-stock.use-case';
 import { PreviewBarcodeUseCase } from '@application/inventory/catalog/barcode-sheet/preview-barcode.use-case';
 import { ReadStockCardUseCase } from '@application/inventory/stock/report/read-stock-card.use-case';
 import { RenderBarcodeSheetUseCase } from '@application/inventory/catalog/barcode-sheet/render-barcode-sheet.use-case';
@@ -70,6 +71,7 @@ export interface McpToolDeps {
   readProduct: ReadProductUseCase;
   readStockCard: ReadStockCardUseCase;
   issueStock: IssueStockUseCase;
+  transferStock: TransferStockUseCase;
   listPrices: ListCommercialPricesUseCase;
   listPriceProposals: ListPriceProposalsUseCase;
   listCommercialPriceHistory: ListCommercialPriceHistoryUseCase;
@@ -200,6 +202,19 @@ export function buildMcpTools(deps: McpToolDeps): McpToolHandler[] {
       return analyzeMcpMedia(text(input, 'prompt'), input.images, await deps.aiSettings?.credentials(current.companyId));
     }),
     tool('issue-stock', 'session', 'inventory', 'edit', async (session, input) => issueStock(deps, requireSession(session).companyId, input)),
+    tool('transfer-stock', 'session', 'inventory', 'edit', async (session, input) => ({
+      document: await deps.transferStock.execute({
+        companyId: requireSession(session).companyId,
+        idempotencyKey: text(input, 'idempotencyKey'),
+        occurredAt: text(input, 'occurredAt'),
+        productId: text(input, 'productId'),
+        unit: text(input, 'unit'),
+        quantity: numberValue(input, 'quantity'),
+        originWarehouseId: text(input, 'originWarehouseId'),
+        destinationWarehouseId: text(input, 'destinationWarehouseId'),
+        selectedLayerId: optionalText(input.selectedLayerId),
+      }),
+    })),
     tool('list-commercial-prices', 'session', 'prices', 'view', async (session, input) =>
       deps.listPrices.execute(requireSession(session).companyId, numberValue(input, 'page'), numberValue(input, 'pageSize'), optionalText(input.search) ?? ''),
     ),

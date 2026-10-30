@@ -18,6 +18,7 @@ import { DashboardUseCase } from '@application/inventory/stock/dashboard/dashboa
 import { ImportCatalogUseCase } from '@application/inventory/catalog/import/import-catalog.use-case';
 import { ImportCountUseCase } from '@application/inventory/catalog/import/import-count.use-case';
 import { IssueStockUseCase } from '@application/inventory/stock/issue/issue-stock.use-case';
+import { TransferStockUseCase } from '@application/inventory/stock/transfer/transfer-stock.use-case';
 import { PreviewBarcodeUseCase } from '@application/inventory/catalog/barcode-sheet/preview-barcode.use-case';
 import { ReadStockCardUseCase } from '@application/inventory/stock/report/read-stock-card.use-case';
 import { RenderBarcodeSheetUseCase } from '@application/inventory/catalog/barcode-sheet/render-barcode-sheet.use-case';
@@ -94,6 +95,7 @@ import { ReadUiPreferencesUseCase, SaveUiPreferencesUseCase } from '@application
         readProduct: ReadProductUseCase,
         readStockCard: ReadStockCardUseCase,
         issueStock: IssueStockUseCase,
+        transferStock: TransferStockUseCase,
         listPrices: ListCommercialPricesUseCase,
         listPriceProposals: ListPriceProposalsUseCase,
         listCommercialPriceHistory: ListCommercialPriceHistoryUseCase,
@@ -143,6 +145,7 @@ import { ReadUiPreferencesUseCase, SaveUiPreferencesUseCase } from '@application
           readProduct,
           readStockCard,
           issueStock,
+          transferStock,
           listPrices,
           listPriceProposals,
           listCommercialPriceHistory,
@@ -192,6 +195,7 @@ import { ReadUiPreferencesUseCase, SaveUiPreferencesUseCase } from '@application
         ReadProductUseCase,
         ReadStockCardUseCase,
         IssueStockUseCase,
+        TransferStockUseCase,
         ListCommercialPricesUseCase,
         ListPriceProposalsUseCase,
         ListCommercialPriceHistoryUseCase,

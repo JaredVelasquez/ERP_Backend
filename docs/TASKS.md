@@ -513,7 +513,7 @@ Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión f
 - **Correlativos:** asignar folios de forma atómica/idempotente y auditar reserva, emisión, fallas, anulaciones y saltos. Alertar vencimiento/agotamiento. Nunca consumir numeración en vista previa. La reutilización de huecos requiere regla fiscal validada.
 - **Listo cuando:** renovar el CAI no afecta documentos anteriores; regenerar conserva CAI, correlativo, contenido, plantilla y recursos originales; ningún PDF generado se persiste en R2/S3 y ningún binario se guarda en PostgreSQL.
 ## T-053 — Bodegas múltiples con inventario independiente
-- **Estado:** [~] backend hecho el 29-10-2026; falta exponerlo en MCP y construir la pantalla en la tienda/admin (frontend).
+- **Estado:** [~] backend completo (HTTP y MCP) el 29-10-2026; falta construir la pantalla en la tienda/admin (frontend).
 - **Deps:** T-024, T-025, T-028, T-029.
 - **Hecho:**
   - Las capas de costo ya estaban aisladas por `(empresa, bodega, producto)` desde una migración previa (`026_phase2_financial_inventory_controls.sql`); lo que faltaba era la operación de traslado y la administración de bodegas, no el aislamiento en sí.
@@ -522,10 +522,10 @@ Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión f
   - `JournalLine` ganó un campo opcional `costCenter`; nueva columna `journal_lines.cost_center` (migración `027_journal_line_cost_center.sql`, aplicada en `erp_dev`).
   - Administrar bodegas: ya existía crear y fijar la bodega por defecto; se agregó **renombrar** (`PUT /erp/company-controls/warehouses/:id`) y **activar/desactivar** (`PUT .../warehouses/:id/active`, rechaza desactivar la bodega por defecto). `CompanyPort` ganó `createWarehouse` para uso fuera del contexto de Configuración.
   - Filtrar por bodega: `GET /erp/stock-cards` ya aceptaba `warehouseId`; no se tocó.
-  - **Verificado:** lint, build (4 apps) y 57 suites/159 pruebas en verde, incluida una prueba HTTP de extremo a extremo (traslado real, idempotencia, rechazo de origen=destino, operador sin permiso de edición rechazado con 403).
+  - Herramienta MCP `transfer-stock` (mismos permisos y validaciones que el HTTP; módulo `inventory`, acceso `edit`), catálogo MCP ahora con 55 herramientas.
+  - **Verificado:** lint, build (4 apps) y 58 suites/160 pruebas en verde, incluidas dos pruebas de extremo a extremo (HTTP y MCP): traslado real, idempotencia, rechazo de origen=destino, operador sin permiso de edición rechazado con 403.
 - **Pendiente:**
-  - Exponer el traslado y la administración de bodegas como herramienta MCP (el "Listo cuando" original lo pide explícitamente).
-  - Pantalla en `ERP_FRONTEND`/`ERP_ADMIN` para crear/renombrar/desactivar bodegas y hacer el traslado (hoy solo existe la API).
+  - Pantalla en `ERP_FRONTEND`/`ERP_ADMIN` para crear/renombrar/desactivar bodegas y hacer el traslado (hoy solo existe la API/MCP).
   - El tablero (`dashboard.use-case.ts`) todavía no filtra por bodega; `stock-cards` sí.
   - No se migró ningún saldo histórico porque en desarrollo solo existe la bodega Principal; la migración de saldos reales queda para cuando una empresa real tenga más de una bodega.
 - **Decisión de diseño (29-10-2026):** cada bodega tiene su propio inventario (capas y saldos aislados, no solo por empresa/producto) y su propio efecto contable por separado — un movimiento entre bodegas no es invisible contablemente. El dueño señaló que lo más estándar es separar también por centro de costo. Este ERP (a diferencia del Eterbook/COMPAC anterior, que ya traía `Departamento`/`Proyecto` por partida) **no tiene hoy esa dimensión**; T-053 debe introducirla: un centro de costo por bodega, sin duplicar el plan de cuentas — la cuenta de inventario sigue siendo la misma, pero cada línea del asiento lleva el centro de costo de su bodega.
