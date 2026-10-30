@@ -1,7 +1,7 @@
 import type { EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { CostingMethodChangeError } from '@domain/inventory/catalog/costing/costing';
-import type { AccountingPeriod, BankStatementLine, CompanyControls, FiscalEstablishment, FiscalProfile, PrecisionPolicy, SaveCompanyControls, WarehouseControl } from '@domain/operations/company-controls/company-controls';
+import { CompanyControlsError, type AccountingPeriod, type BankStatementLine, type CompanyControls, type FiscalEstablishment, type FiscalProfile, type PrecisionPolicy, type SaveCompanyControls, type WarehouseControl } from '@domain/operations/company-controls/company-controls';
 import { CompanyEntity, WarehouseEntity } from '@infrastructure/tenancy/company/postgres/entities/tenancy.entity';
 import { AccountingPeriodEntity, BankStatementLineEntity, CompanyFiscalProfileEntity, FiscalEstablishmentEntity, PrecisionPolicyEntity } from './entities/company-controls.entity';
 import { BankAccountEntity } from '@infrastructure/accounting/payment-settings/postgres/entities/payment-setting.entity';
@@ -37,29 +37,29 @@ export async function insertWarehouse(manager: EntityManager, companyId: string,
 export async function chooseDefaultWarehouse(manager: EntityManager, companyId: string, warehouseId: string): Promise<void> {
   await manager.createQueryBuilder().update(WarehouseEntity).set({ isDefault: false }).where('companyId = :companyId', { companyId }).execute();
   const result = await manager.createQueryBuilder().update(WarehouseEntity).set({ isDefault: true, active: true }).where('companyId = :companyId AND id = :warehouseId', { companyId, warehouseId }).execute();
-  if (!result.affected) throw new Error('Warehouse was not found');
+  if (!result.affected) throw new CompanyControlsError('Warehouse was not found');
 }
 
 export async function renameWarehouse(manager: EntityManager, companyId: string, warehouseId: string, name: string): Promise<void> {
   const trimmed = name.trim();
-  if (trimmed === '') throw new Error('Warehouse name is required');
+  if (trimmed === '') throw new CompanyControlsError('Warehouse name is required');
   const result = await manager.createQueryBuilder().update(WarehouseEntity).set({ name: trimmed })
     .where('companyId = :companyId AND id = :warehouseId', { companyId, warehouseId }).execute();
-  if (!result.affected) throw new Error('Warehouse was not found');
+  if (!result.affected) throw new CompanyControlsError('Warehouse was not found');
 }
 
 export async function setWarehouseActive(manager: EntityManager, companyId: string, warehouseId: string, active: boolean): Promise<void> {
   await assertCanDeactivate(manager, companyId, warehouseId, active);
   const result = await manager.createQueryBuilder().update(WarehouseEntity).set({ active })
     .where('companyId = :companyId AND id = :warehouseId', { companyId, warehouseId }).execute();
-  if (!result.affected) throw new Error('Warehouse was not found');
+  if (!result.affected) throw new CompanyControlsError('Warehouse was not found');
 }
 
 async function assertCanDeactivate(manager: EntityManager, companyId: string, warehouseId: string, active: boolean): Promise<void> {
   if (active) return;
   const warehouse = await manager.createQueryBuilder(WarehouseEntity, 'warehouse')
     .where('warehouse.companyId = :companyId AND warehouse.id = :warehouseId', { companyId, warehouseId }).getOne();
-  if (warehouse?.isDefault) throw new Error('Cannot deactivate the default warehouse');
+  if (warehouse?.isDefault) throw new CompanyControlsError('Cannot deactivate the default warehouse');
 }
 
 async function assertNoDefaultCostedStock(manager: EntityManager, companyId: string): Promise<void> {
@@ -84,7 +84,7 @@ export async function updatePeriodStatus(manager: EntityManager, companyId: stri
     ? { status, closedBy: actorId, closedAt: new Date(), reopenedBy: null, reopenedAt: null, reopenReason: null }
     : { status, closedBy: null, closedAt: null, reopenedBy: actorId, reopenedAt: new Date(), reopenReason: reason };
   const result = await manager.createQueryBuilder().update(AccountingPeriodEntity).set(patch).where('companyId = :companyId AND id = :periodId', { companyId, periodId }).execute();
-  if (!result.affected) throw new Error('Accounting period was not found');
+  if (!result.affected) throw new CompanyControlsError('Accounting period was not found');
 }
 
 export async function insertBankLine(manager: EntityManager, companyId: string, actorId: string, line: BankStatementLine): Promise<void> {
@@ -93,7 +93,7 @@ export async function insertBankLine(manager: EntityManager, companyId: string, 
 
 export async function updateBankLineStatus(manager: EntityManager, companyId: string, lineId: string, status: BankStatementLine['status'], journalEntryId: string | null): Promise<void> {
   const result = await manager.createQueryBuilder().update(BankStatementLineEntity).set({ status, matchedJournalEntryId: status === 'matched' ? journalEntryId : null }).where('companyId = :companyId AND id = :lineId', { companyId, lineId }).execute();
-  if (!result.affected) throw new Error('Bank statement line was not found');
+  if (!result.affected) throw new CompanyControlsError('Bank statement line was not found');
 }
 
 function readEstablishments(manager: EntityManager, companyId: string): Promise<FiscalEstablishment[]> {

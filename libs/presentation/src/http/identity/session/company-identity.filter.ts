@@ -14,6 +14,7 @@ import { SpreadsheetError } from '@domain/inventory/catalog/import/spreadsheet';
 import { ProductError } from '@domain/inventory/catalog/product/product';
 import { LayoutError } from '@domain/workspace/layout/layout';
 import { PaymentSettingsError } from '@domain/accounting/payment-settings/payment-settings';
+import { CompanyControlsError } from '@domain/operations/company-controls/company-controls';
 import { CompanyIdentityError } from '@domain/tenancy/company/company';
 import { ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
 import type { Response } from 'express';
@@ -41,6 +42,7 @@ import type { Response } from 'express';
   McpError,
   LayoutError,
   PaymentSettingsError,
+  CompanyControlsError,
 )
 export class CompanyIdentityFilter implements ExceptionFilter {
   catch(
@@ -66,7 +68,8 @@ export class CompanyIdentityFilter implements ExceptionFilter {
       | PermissionDeniedError
       | McpError
       | LayoutError
-      | PaymentSettingsError,
+      | PaymentSettingsError
+      | CompanyControlsError,
     host: ArgumentsHost,
   ): void {
     const response = host.switchToHttp().getResponse<Response>();

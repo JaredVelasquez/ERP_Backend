@@ -1,6 +1,6 @@
 import { DataSource, type DataSourceOptions } from 'typeorm';
 import { CatalogImportBatchEntity } from '@infrastructure/catalog/import/postgres/entities/catalog-import-batch.entity';
-import { PriceChangeEntity, PresentationEntity, ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
+import { CostingPolicyChangeEntity, PriceChangeEntity, PresentationEntity, ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
 import { CommercialPriceChangeEntity, PriceProposalEntity } from '@infrastructure/catalog/pricing/postgres/entities/price-workflow.entity';
 import { AssistantConversationEntity } from '@infrastructure/assistant/conversation/postgres/entities/assistant-conversation.entity';
 import { AssistantConversationMessageEntity } from '@infrastructure/assistant/conversation/postgres/entities/assistant-conversation-message.entity';
@@ -81,6 +81,7 @@ export function typeOrmDataSourceOptions(env: Readonly<Record<string, string | u
       ProductEntity,
       PresentationEntity,
       PriceChangeEntity,
+      CostingPolicyChangeEntity,
       CommercialPriceChangeEntity,
       PriceProposalEntity,
       TenantEntity,
