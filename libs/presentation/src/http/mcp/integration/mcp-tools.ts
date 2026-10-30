@@ -355,9 +355,15 @@ async function confirmInventory(deps: McpToolDeps, companyId: string, input: Jso
   if (company === null) {
     throw new DocumentError('Company was not found');
   }
+  const warehouses = await deps.companies.listWarehouses(companyId);
+  const requestedWarehouseId = optionalText(input.warehouseId);
+  const warehouse = requestedWarehouseId === null
+    ? warehouses.find((item) => item.isDefault && item.active)
+    : warehouses.find((item) => item.id === requestedWarehouseId && item.active);
+  if (warehouse === undefined) throw new DocumentError('Warehouse was not found or is inactive');
   return {
     document: await deps.confirmDocument.execute({
-      draft: documentDraft(input, companyId),
+      draft: { ...documentDraft(input, companyId), warehouseId: warehouse.id },
       companyCostingMethod: company.costingMethod,
       receivedAt: text(input, 'receivedAt'),
     }),

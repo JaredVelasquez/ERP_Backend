@@ -10,6 +10,14 @@ describe('legacy schema migration safety', () => {
     expect(() => assertSafeLegacyMigration('002_next.sql', 'sha', undefined, true)).toThrow('Refusing to recreate schema');
   });
 
+  it('allows an append-only migration after the registered baseline', () => {
+    expect(assertSafeLegacyMigration('020_next.sql', 'sha', undefined, true, true)).toBe('pending');
+  });
+
+  it('does not allow an unregistered migration inserted into the historical baseline', () => {
+    expect(() => assertSafeLegacyMigration('010_inserted.sql', 'sha', undefined, true, false)).toThrow('Refusing to recreate schema');
+  });
+
   it('allows an initial migration only on an empty database', () => {
     expect(assertSafeLegacyMigration('001_initial.sql', 'sha', undefined, false)).toBe('pending');
   });

@@ -5,6 +5,7 @@ import { DocumentError, planConfirmation, type DraftDocument, type StockSnapshot
 import { LEDGER_PORT, type ConfirmedDocument, type InventoryLedgerPort } from '@domain/inventory/stock/ledger/ledger.port';
 import { PRODUCT_PORT, type ProductPort } from '@domain/inventory/catalog/product/product.port';
 import type { Product } from '@domain/inventory/catalog/product/product';
+import { TAX_CATEGORIES } from '@domain/accounting/account/chart';
 
 export interface ConfirmDocumentCommand {
   draft: DraftDocument;
@@ -40,6 +41,7 @@ export class ConfirmDocumentUseCase {
     const document: ConfirmedDocument = {
       id: command.draft.id,
       companyId: command.draft.companyId,
+      warehouseId: command.draft.warehouseId ?? '',
       type: command.draft.type,
       status: 'confirmed',
       idempotencyKey: command.draft.idempotencyKey,
@@ -53,7 +55,7 @@ export class ConfirmDocumentUseCase {
     await this.ledger.commit({
       document,
       voidedDocumentId: null,
-      stock: plan.stockChanges.map((change) => ({ ...change, companyId: command.draft.companyId })),
+      stock: plan.stockChanges.map((change) => ({ ...change, companyId: command.draft.companyId, warehouseId: command.draft.warehouseId ?? '' })),
     });
     return document;
   }
@@ -64,7 +66,7 @@ export class ConfirmDocumentUseCase {
     }
     const lines = await Promise.all(draft.lines.map(async (line) => {
       const product = await this.products.find(draft.companyId, line.productId);
-      if (product === null || !product.active) {
+      if (product === null || !product.active || product.itemType === 'service') {
         throw new DocumentError('Product was not found or inactive');
       }
       const matching = product.presentations.filter((presentation) =>
@@ -79,7 +81,9 @@ export class ConfirmDocumentUseCase {
       if (line.saleAmount !== null && Math.abs(line.saleAmount - saleAmount) > 0.01) {
         throw new DocumentError('Sale price changed; refresh the ticket');
       }
-      return { ...line, saleAmount };
+      const taxCategory = TAX_CATEGORIES.find((category) => category.code === product.taxCategoryCode);
+      if (taxCategory === undefined) throw new DocumentError('Product tax category was not found');
+      return { ...line, saleAmount, taxRate: taxCategory.ratePercent };
     }));
     return { ...draft, lines };
   }
@@ -90,8 +94,8 @@ export class ConfirmDocumentUseCase {
     }
     const ids = uniqueIds(command.draft.lines.map((line) => line.productId));
     const found = await Promise.all(ids.map((id) => this.products.find(command.draft.companyId, id)));
-    const stored = await this.ledger.loadStock(command.draft.companyId, ids);
-    return ids.map((id, index) => toSnapshot(id, found[index] ?? null, stored, command.companyCostingMethod));
+    const stored = await this.ledger.loadStock(command.draft.companyId, ids, command.draft.warehouseId);
+    return ids.map((id, index) => toSnapshot(id, found[index]?.itemType === 'service' ? null : found[index] ?? null, stored, command.companyCostingMethod));
   }
 }
 

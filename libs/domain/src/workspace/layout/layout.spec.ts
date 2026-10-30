@@ -30,7 +30,7 @@ describe('saved layouts', () => {
       { key: 'forecast', visible: true, x: 3, y: 9, w: 4, h: 2, chartType: 'bar' },
     ]);
 
-    expect(widgets.map((widget) => widget.key)).toEqual(['activity', 'sales', 'shrinkage', 'inventory']);
+    expect(widgets.map((widget) => widget.key)).toEqual(['activity', 'sales', 'shrinkage', 'inventory', 'sales-chart', 'movement-chart']);
     expect(widgets.find((widget) => widget.key === 'forecast')).toBeUndefined();
     expect(() => assertCanViewTable([{ module: 'products', access: 'view' }], 'company-users')).toThrow(PermissionDeniedError);
     expect(assertCanViewTable([{ module: 'products', access: 'view' }], 'products')).toBe('products');

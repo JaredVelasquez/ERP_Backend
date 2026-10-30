@@ -100,6 +100,7 @@ export const TAX_CATEGORIES: readonly TaxCategorySeed[] = [
 
 export const POSTING_RULES: readonly PostingRuleSeed[] = [
   { documentType: 'sale-revenue', debitCode: null, creditCode: '4.01.01.001', debitUsesCollectionAccount: true, creditUsesPaymentAccount: false },
+  { documentType: 'sale-tax', debitCode: null, creditCode: '2.01.02.001', debitUsesCollectionAccount: true, creditUsesPaymentAccount: false },
   { documentType: 'sale-cost', debitCode: '5.01.01.001', creditCode: '1.01.02.001', debitUsesCollectionAccount: false, creditUsesPaymentAccount: false },
   { documentType: 'purchase-cash', debitCode: '1.01.02.001', creditCode: null, debitUsesCollectionAccount: false, creditUsesPaymentAccount: true },
   { documentType: 'purchase-credit', debitCode: '1.01.02.001', creditCode: '2.01.01.001', debitUsesCollectionAccount: false, creditUsesPaymentAccount: false },

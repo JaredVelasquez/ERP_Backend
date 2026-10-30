@@ -3,7 +3,7 @@ import { PriceError, type PriceChange } from '@domain/inventory/catalog/product/
 import type { PricePort } from '@domain/inventory/catalog/product/price.port';
 import type { CostingMethod } from '@domain/inventory/catalog/costing/costing';
 import type { Presentation, Product } from '@domain/inventory/catalog/product/product';
-import type { ProductPort } from '@domain/inventory/catalog/product/product.port';
+import type { CatalogItemTypeFilter, ProductPort } from '@domain/inventory/catalog/product/product.port';
 import { readProductSort } from '@domain/inventory/catalog/product/product-sort';
 import { pageOffset, type Page, type PageRequest } from '@domain/workspace/company-list/page';
 import { PriceChangeEntity, PresentationEntity, ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
@@ -38,9 +38,9 @@ export class PostgresProductRepository implements ProductPort, PricePort {
     return products.map(domainProduct);
   }
 
-  async listPage(companyId: string, request: PageRequest): Promise<Page<Product>> {
+  async listPage(companyId: string, request: PageRequest, itemType: CatalogItemTypeFilter = 'product'): Promise<Page<Product>> {
     const page = await this.database.withManager((manager) =>
-      readProductPage(manager, companyId, request.search, readProductSort(request.sort), pageOffset(request), request.pageSize));
+      readProductPage(manager, companyId, request.search, readProductSort(request.sort), pageOffset(request), request.pageSize, itemType));
     return {
       items: page.items.map(domainProduct),
       page: request.page,
@@ -80,6 +80,7 @@ function productEntity(product: Product): ProductEntity {
     id: product.id,
     companyId: product.companyId,
     name: product.name,
+    itemType: product.itemType ?? 'product',
     category: product.category,
     supplier: product.supplier ?? null,
     baseUnit: product.baseUnit,
@@ -101,6 +102,7 @@ function presentationEntity(productId: string, presentation: Presentation): Pres
     purchasable: presentation.purchasable,
     sellable: presentation.sellable,
     salePrice: presentation.salePrice === null ? null : String(presentation.salePrice),
+    referenceUnitCost: presentation.referenceUnitCost === null || presentation.referenceUnitCost === undefined ? null : String(presentation.referenceUnitCost),
     manufacturerBarcode: presentation.manufacturerBarcode,
   });
 }
@@ -124,6 +126,7 @@ function domainProduct(entity: ProductEntity): Product {
     id: entity.id,
     companyId: entity.companyId,
     name: entity.name,
+    itemType: entity.itemType === 'service' ? 'service' : 'product',
     category: entity.category,
     supplier: entity.supplier,
     baseUnit: entity.baseUnit,
@@ -139,6 +142,7 @@ function domainProduct(entity: ProductEntity): Product {
       purchasable: presentation.purchasable,
       sellable: presentation.sellable,
       salePrice: nullableNumber(presentation.salePrice),
+      referenceUnitCost: nullableNumber(presentation.referenceUnitCost),
       manufacturerBarcode: presentation.manufacturerBarcode,
     })),
   };

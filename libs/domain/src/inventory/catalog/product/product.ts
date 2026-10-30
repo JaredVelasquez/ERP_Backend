@@ -14,6 +14,7 @@ export interface Presentation {
   purchasable: boolean;
   sellable: boolean;
   salePrice: number | null;
+  referenceUnitCost?: number | null;
   manufacturerBarcode: string | null;
 }
 
@@ -21,6 +22,7 @@ export interface Product {
   id: string;
   companyId: string;
   name: string;
+  itemType?: 'product' | 'service';
   category: string;
   supplier?: string | null;
   baseUnit: string;

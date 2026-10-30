@@ -67,7 +67,8 @@ describe('phase 2 inventory http', () => {
     const card = await fetch(`${baseUrl}/erp/stock-cards?companyId=${shop.companyId}&code=${first.internalBarcode}`, {
       headers: bearer(shop.token),
     });
-    const cardBody = (await card.json()) as { card: { name: string; baseQuantity: number; unitCost: number; internalBarcode: string } };
+    const cardBody = (await card.json()) as { card: { name: string; baseQuantity: number; unitCost: number; internalBarcode: string; presentations: Array<{ sellable: boolean; purchasable: boolean }> } };
+    expect(cardBody.card.presentations).toContainEqual(expect.objectContaining({ sellable: true, purchasable: true }));
     const missing = await fetch(`${baseUrl}/erp/stock-cards?companyId=${shop.companyId}&code=99999999`, {
       headers: bearer(shop.token),
     });

@@ -13,6 +13,7 @@ export interface IssueStockCommand {
   idempotencyKey: string;
   receivedAt: string;
   lines: IssueLineRequest[];
+  warehouseId?: string;
 }
 
 @Injectable()
@@ -32,10 +33,14 @@ export class IssueStockUseCase {
     if (company === null) {
       throw new DocumentError('Company was not found');
     }
+    const warehouses = await this.companies.listWarehouses(command.companyId);
+    const warehouseId = command.warehouseId ?? warehouses.find((warehouse) => warehouse.isDefault)?.id;
+    if (warehouseId === undefined) throw new DocumentError('Default warehouse was not found');
     const draft = buildOutboundAdjustment({
       id: randomUUID(),
       companyId: command.companyId,
       idempotencyKey: command.idempotencyKey,
+      warehouseId,
       lines: await this.documentLines(command.companyId, command.lines),
     });
     return this.confirmDocument.execute({
@@ -79,6 +84,7 @@ export class IssueStockUseCase {
     if (!product.active) {
       throw new DocumentError('Product is inactive');
     }
+    if (product.itemType === 'service') throw new DocumentError('Services do not have warehouse stock');
     return product;
   }
 }

@@ -4,11 +4,20 @@ import { JournalEntryError, type JournalEntry } from '@domain/accounting/journal
 import { JournalEntryEntity, JournalEntryLineEntity } from '@infrastructure/accounting/journal-entry/postgres/entities/journal-entry.entity';
 
 export async function appendEntry(manager: EntityManager, entry: JournalEntry): Promise<JournalEntry> {
+  await assertOpenPeriod(manager, entry.companyId, entry.occurredAt);
   const inserted = await manager.getRepository(JournalEntryEntity).createQueryBuilder().insert().values(entryValues(entry))
     .orIgnore().returning('id').execute();
   if (inserted.raw.length === 0) return requireEntry(await readEntryByKey(manager, entry.companyId, entry.idempotencyKey));
   await insertLines(manager, entry);
   return requireEntry(await readEntry(manager, entry.companyId, entry.id));
+}
+
+async function assertOpenPeriod(manager: EntityManager, companyId: string, occurredAt: string): Promise<void> {
+  const date = occurredAt.slice(0, 10);
+  const period = await manager.createQueryBuilder().select('period.status', 'status').from('accounting_periods', 'period')
+    .where('period.company_id = :companyId AND :date BETWEEN period.starts_on AND period.ends_on', { companyId, date })
+    .orderBy('period.starts_on', 'DESC').getRawOne<{ status: string }>();
+  if (period?.status === 'closed') throw new JournalEntryError('El periodo contable de esta fecha está cerrado.');
 }
 
 export async function readEntry(manager: EntityManager, companyId: string, id: string): Promise<JournalEntry | null> {

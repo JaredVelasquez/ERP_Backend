@@ -26,6 +26,7 @@ export class VoidDocumentUseCase {
     const reversal: ConfirmedDocument = {
       id: reversalId,
       companyId,
+      warehouseId: original.warehouseId ?? '',
       type: 'void',
       status: 'confirmed',
       idempotencyKey: `void:${original.id}`,
@@ -39,7 +40,7 @@ export class VoidDocumentUseCase {
     await this.ledger.commit({
       document: reversal,
       voidedDocumentId: original.id,
-      stock: plan.stockChanges.map((change) => ({ ...change, companyId })),
+      stock: plan.stockChanges.map((change) => ({ ...change, companyId, warehouseId: original.warehouseId ?? '' })),
     });
     return reversal;
   }
@@ -54,7 +55,7 @@ export class VoidDocumentUseCase {
 
   private async currentStock(original: ConfirmedDocument): Promise<StockSnapshot[]> {
     const ids = uniqueIds(original.effects.map((effect) => effect.productId));
-    const stored = await this.ledger.loadStock(original.companyId, ids);
+    const stored = await this.ledger.loadStock(original.companyId, ids, original.warehouseId);
     return stored.map((row) => ({ productId: row.productId, method: 'PEPS' as const, layers: row.layers }));
   }
 }

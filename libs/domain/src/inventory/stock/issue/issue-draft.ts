@@ -19,11 +19,13 @@ export function buildOutboundAdjustment(input: {
   id: string;
   companyId: string;
   idempotencyKey: string;
+  warehouseId?: string;
   lines: DocumentLine[];
 }): DraftDocument {
   const draft: DraftDocument = {
     id: input.id,
     companyId: input.companyId,
+    warehouseId: input.warehouseId,
     type: 'adjustment',
     idempotencyKey: input.idempotencyKey,
     paymentAccountCode: null,

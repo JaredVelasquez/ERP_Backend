@@ -1,7 +1,7 @@
 import { PriceError, type PriceChange } from '@domain/inventory/catalog/product/price';
 import type { PricePort } from '@domain/inventory/catalog/product/price.port';
 import type { Product } from '@domain/inventory/catalog/product/product';
-import type { ProductPort } from '@domain/inventory/catalog/product/product.port';
+import type { CatalogItemTypeFilter, ProductPort } from '@domain/inventory/catalog/product/product.port';
 import { readProductSort, sortProducts } from '@domain/inventory/catalog/product/product-sort';
 import { slicePage, type Page, type PageRequest } from '@domain/workspace/company-list/page';
 
@@ -32,8 +32,9 @@ export class InMemoryProductRepository implements ProductPort, PricePort {
     return products;
   }
 
-  async listPage(companyId: string, request: PageRequest): Promise<Page<Product>> {
-    return slicePage(orderedMatches(await this.list(companyId), request), request);
+  async listPage(companyId: string, request: PageRequest, itemType: CatalogItemTypeFilter = 'product'): Promise<Page<Product>> {
+    const products = (await this.list(companyId)).filter((product) => itemType === 'all' || (product.itemType ?? 'product') === itemType);
+    return slicePage(orderedMatches(products, request), request);
   }
 
   async record(product: Product, change: PriceChange): Promise<void> {

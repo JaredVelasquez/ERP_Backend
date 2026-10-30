@@ -1,5 +1,6 @@
 import type { EntityManager } from 'typeorm';
 import type { ProductSort } from '@domain/inventory/catalog/product/product-sort';
+import type { CatalogItemTypeFilter } from '@domain/inventory/catalog/product/product.port';
 import { PriceChangeEntity, PresentationEntity, ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
 
 export async function readProducts(manager: EntityManager, companyId: string, productId?: string): Promise<ProductEntity[]> {
@@ -19,10 +20,12 @@ export async function readProductPage(
   sort: ProductSort,
   offset: number,
   pageSize: number,
+  itemType: CatalogItemTypeFilter = 'product',
 ): Promise<{ items: ProductEntity[]; total: number }> {
   const query = manager.getRepository(ProductEntity).createQueryBuilder('product')
     .leftJoinAndSelect('product.presentations', 'presentation')
     .where('product.companyId = :companyId', { companyId });
+  if (itemType !== 'all') query.andWhere('product.itemType = :itemType', { itemType });
   if (search.trim() !== '') {
     const term = `%${search.trim()}%`;
     query.andWhere(`(

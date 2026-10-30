@@ -27,6 +27,9 @@ export interface Warehouse {
   id: string;
   companyId: string;
   name: string;
+  code?: string;
+  active?: boolean;
+  isDefault?: boolean;
 }
 
 export class CompanyIdentityError extends Error {
@@ -66,5 +69,5 @@ export function createCompany(input: NewCompanyInput): Company {
 }
 
 export function createDefaultWarehouse(companyId: string, warehouseId: string): Warehouse {
-  return { id: warehouseId, companyId, name: 'Principal' };
+  return { id: warehouseId, companyId, name: 'Principal', code: 'BOD-001', active: true, isDefault: true };
 }

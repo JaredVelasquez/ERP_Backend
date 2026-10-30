@@ -35,10 +35,11 @@ export class ProductsController {
     @Query('pageSize') pageSize = '25',
     @Query('search') search = '',
     @Query('sort') sort = '',
+    @Query('itemType') itemType: 'product' | 'service' | 'all' = 'product',
   ): Promise<Page<Product>> {
     const session = await requireCompanySession(this.identity, request.headers);
     assertSameCompany(session, companyId);
-    return this.listProducts.execute(session.companyId, page, pageSize, search, sort);
+    return this.listProducts.execute(session.companyId, page, pageSize, search, sort, itemType);
   }
 
   @Get('price-history')

@@ -10,7 +10,7 @@ import {
 } from '@infrastructure/inventory/ledger/postgres/entities/inventory-ledger.entity';
 
 interface HeaderRow {
-  id: string; companyId: string; documentType: string; status: string; idempotencyKey: string;
+  id: string; companyId: string; warehouseId: string; documentType: string; status: string; idempotencyKey: string;
   occurredAt: Date | string | null; createdAt: Date | string; reversalId: string | null; reversalOf: string | null;
 }
 interface LineRow { documentId: string; productId: string; direction: string; quantity: unknown; cost: unknown; revenue: unknown }
@@ -36,7 +36,7 @@ export async function findDocument(manager: EntityManager, companyId: string, do
 
 export async function listDocuments(manager: EntityManager, companyId: string): Promise<ConfirmedDocument[]> {
   const headers = await manager.getRepository(InventoryDocumentEntity).createQueryBuilder('document')
-    .select('document.id', 'id').addSelect('document.companyId', 'companyId').addSelect('document.documentType', 'documentType')
+    .select('document.id', 'id').addSelect('document.companyId', 'companyId').addSelect('document.warehouseId', 'warehouseId').addSelect('document.documentType', 'documentType')
     .addSelect('document.status', 'status').addSelect('document.idempotencyKey', 'idempotencyKey')
     .addSelect('COALESCE(document.occurredAt, document.createdAt)', 'occurredAt')
     .addSelect('document.createdAt', 'createdAt').addSelect('document.reversalId', 'reversalId').addSelect('document.reversalOf', 'reversalOf')
@@ -53,13 +53,14 @@ export async function listDocuments(manager: EntityManager, companyId: string): 
   return headers.map((header) => assemble(header, lineMap.get(header.id) ?? [], effectMap.get(header.id) ?? [], journalMap.get(header.id) ?? []));
 }
 
-export async function loadStock(manager: EntityManager, companyId: string, productIds: readonly string[]): Promise<Array<{ productId: string; layers: CostLayer[] }>> {
+export async function loadStock(manager: EntityManager, companyId: string, productIds: readonly string[], warehouseId?: string): Promise<Array<{ productId: string; layers: CostLayer[] }>> {
   if (productIds.length === 0) return [];
-  const rows = await manager.getRepository(CostLayerEntity).createQueryBuilder('layer')
+  const query = manager.getRepository(CostLayerEntity).createQueryBuilder('layer')
     .select('layer.id', 'id').addSelect('layer.productId', 'productId').addSelect('layer.receivedAt', 'receivedAt')
     .addSelect('layer.expiresOn', 'expiresOn').addSelect('layer.quantity', 'quantity').addSelect('layer.unitCost', 'unitCost')
-    .where('layer.companyId = :companyId', { companyId }).andWhere('layer.productId IN (:...productIds)', { productIds })
-    .orderBy('layer.receivedAt', 'ASC').addOrderBy('layer.id', 'ASC').getRawMany<LayerRow>();
+    .where('layer.companyId = :companyId', { companyId }).andWhere('layer.productId IN (:...productIds)', { productIds });
+  if (warehouseId !== undefined) query.andWhere('layer.warehouseId = :warehouseId', { warehouseId });
+  const rows = await query.orderBy('layer.receivedAt', 'ASC').addOrderBy('layer.id', 'ASC').getRawMany<LayerRow>();
   const grouped = new Map<string, CostLayer[]>();
   for (const row of rows) {
     const layers = grouped.get(row.productId) ?? [];
@@ -71,7 +72,11 @@ export async function loadStock(manager: EntityManager, companyId: string, produ
 
 export async function commitLedger(manager: EntityManager, change: LedgerCommit): Promise<void> {
   assertBalanced(change.document.journal);
+  await assertOpenPeriod(manager, change.document.companyId, change.document.occurredAt);
   await lockCompany(manager, change.document.companyId);
+  const warehouseId = await resolveWarehouseId(manager, change.document.companyId, change.document.warehouseId ?? '');
+  change.document.warehouseId = warehouseId;
+  for (const stock of change.stock) stock.warehouseId = warehouseId;
   await assertNoSecondOpening(manager, change.document);
   await insertDocument(manager, change.document);
   await insertLines(manager, change.document);
@@ -81,9 +86,25 @@ export async function commitLedger(manager: EntityManager, change: LedgerCommit)
   await markVoided(manager, change);
 }
 
+async function assertOpenPeriod(manager: EntityManager, companyId: string, occurredAt: string): Promise<void> {
+  const date = occurredAt.slice(0, 10);
+  const period = await manager.createQueryBuilder().select('period.status', 'status').from('accounting_periods', 'period')
+    .where('period.company_id = :companyId AND :date BETWEEN period.starts_on AND period.ends_on', { companyId, date })
+    .orderBy('period.starts_on', 'DESC').getRawOne<{ status: string }>();
+  if (period?.status === 'closed') throw new DocumentError('Accounting period is closed');
+}
+
+async function resolveWarehouseId(manager: EntityManager, companyId: string, warehouseId: string): Promise<string> {
+  if (warehouseId !== '') return warehouseId;
+  const row = await manager.createQueryBuilder().select('warehouse.id', 'id').from('warehouses', 'warehouse')
+    .where('warehouse.company_id = :companyId AND warehouse.is_default = true', { companyId }).getRawOne<{ id: string }>();
+  if (!row) throw new DocumentError('Default warehouse was not found');
+  return row.id;
+}
+
 async function readDocument(manager: EntityManager, documentId: string, companyId: string): Promise<ConfirmedDocument | null> {
   const header = await manager.getRepository(InventoryDocumentEntity).createQueryBuilder('document')
-    .select('document.id', 'id').addSelect('document.companyId', 'companyId').addSelect('document.documentType', 'documentType')
+    .select('document.id', 'id').addSelect('document.companyId', 'companyId').addSelect('document.warehouseId', 'warehouseId').addSelect('document.documentType', 'documentType')
     .addSelect('document.status', 'status').addSelect('document.idempotencyKey', 'idempotencyKey')
     .addSelect('COALESCE(document.occurredAt, document.createdAt)', 'occurredAt')
     .addSelect('document.createdAt', 'createdAt').addSelect('document.reversalId', 'reversalId').addSelect('document.reversalOf', 'reversalOf')
@@ -142,7 +163,7 @@ async function assertNoSecondOpening(manager: EntityManager, document: Confirmed
 async function insertDocument(manager: EntityManager, document: ConfirmedDocument): Promise<void> {
   const occurredAt = new Date(document.occurredAt);
   await manager.getRepository(InventoryDocumentEntity).createQueryBuilder().insert().values({
-    id: document.id, companyId: document.companyId, documentType: document.type, status: document.status,
+    id: document.id, companyId: document.companyId, warehouseId: document.warehouseId, documentType: document.type, status: document.status,
     idempotencyKey: document.idempotencyKey, reversalOf: document.reversalOf, reversalId: document.reversalId,
     occurredAt, createdAt: occurredAt,
   }).execute();
@@ -186,11 +207,11 @@ async function replaceStock(manager: EntityManager, change: LedgerCommit): Promi
   if (change.stock.length === 0) return;
   const productIds = change.stock.map((row) => row.productId);
   await manager.getRepository(CostLayerEntity).createQueryBuilder().delete()
-    .where('companyId = :companyId AND productId IN (:...productIds)', { companyId: change.document.companyId, productIds }).execute();
+    .where('companyId = :companyId AND warehouseId = :warehouseId AND productId IN (:...productIds)', { companyId: change.document.companyId, warehouseId: change.document.warehouseId, productIds }).execute();
   const layers: CostLayerEntity[] = [];
   for (const row of change.stock) {
     for (const layer of row.layers) layers.push(Object.assign(new CostLayerEntity(), {
-      id: layer.id, companyId: row.companyId, productId: row.productId, receivedAt: new Date(layer.receivedAt),
+      id: layer.id, companyId: row.companyId, warehouseId: row.warehouseId, productId: row.productId, receivedAt: new Date(layer.receivedAt),
       expiresOn: layer.expiresOn, quantity: String(layer.quantity), unitCost: String(layer.unitCost),
     }));
   }
@@ -209,7 +230,7 @@ async function markVoided(manager: EntityManager, change: LedgerCommit): Promise
 
 function assemble(header: HeaderRow, lines: readonly LineRow[], effects: readonly EffectRow[], journals: readonly JournalRow[]): ConfirmedDocument {
   return {
-    id: header.id, companyId: header.companyId, type: asDocumentType(header.documentType), status: asStatus(header.status),
+    id: header.id, companyId: header.companyId, warehouseId: header.warehouseId, type: asDocumentType(header.documentType), status: asStatus(header.status),
     idempotencyKey: header.idempotencyKey, occurredAt: dateText(header.occurredAt ?? header.createdAt),
     journal: journals.map((row) => ({ accountCode: row.accountCode, debit: decimal(row.debit), credit: decimal(row.credit) })),
     effects: effects.map((row) => ({

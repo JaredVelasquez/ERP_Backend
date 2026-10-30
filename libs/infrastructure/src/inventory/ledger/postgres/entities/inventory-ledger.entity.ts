@@ -4,6 +4,7 @@ import { Column, Entity, PrimaryColumn } from 'typeorm';
 export class InventoryDocumentEntity {
   @PrimaryColumn('uuid') declare id: string;
   @Column('uuid', { name: 'company_id' }) declare companyId: string;
+  @Column('uuid', { name: 'warehouse_id' }) declare warehouseId: string;
   @Column('varchar', { name: 'document_type', length: 40 }) declare documentType: string;
   @Column('varchar', { length: 20 }) declare status: string;
   @Column('varchar', { name: 'idempotency_key', length: 80 }) declare idempotencyKey: string;
@@ -40,6 +41,7 @@ export class InventoryLayerEffectEntity {
 export class CostLayerEntity {
   @PrimaryColumn('uuid') declare id: string;
   @Column('uuid', { name: 'company_id' }) declare companyId: string;
+  @Column('uuid', { name: 'warehouse_id' }) declare warehouseId: string;
   @Column('uuid', { name: 'product_id' }) declare productId: string;
   @Column('timestamptz', { name: 'received_at' }) declare receivedAt: Date;
   @Column('date', { name: 'expires_on', nullable: true }) declare expiresOn: string | null;

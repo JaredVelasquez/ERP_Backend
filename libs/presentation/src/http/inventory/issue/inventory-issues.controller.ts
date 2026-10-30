@@ -12,6 +12,7 @@ interface IssueBody {
   companyId?: string;
   idempotencyKey?: string;
   receivedAt?: string;
+  warehouseId?: string;
   lines?: IssueLineRequest[];
   type?: unknown;
   collectionAccountCode?: unknown;
@@ -43,6 +44,7 @@ export class InventoryIssuesController {
         companyId: session.companyId,
         idempotencyKey: body.idempotencyKey ?? '',
         receivedAt: body.receivedAt ?? '',
+        warehouseId: body.warehouseId,
         lines: body.lines ?? [],
       }),
     };

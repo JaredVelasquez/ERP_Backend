@@ -25,6 +25,7 @@ export interface DocumentLine {
   quantity: number;
   unitCost: number | null;
   saleAmount: number | null;
+  taxRate?: number | null;
   selectedLayerId: string | null;
   expiresOn: string | null;
   newLayerId: string;
@@ -33,6 +34,7 @@ export interface DocumentLine {
 export interface DraftDocument {
   id: string;
   companyId: string;
+  warehouseId?: string;
   type: DocumentKind;
   idempotencyKey: string;
   paymentAccountCode: string | null;
@@ -160,10 +162,11 @@ function planSale(input: PlanInput): ConfirmationPlan {
   const revenue = requireRule(input.rules, 'sale-revenue');
   const cost = requireRule(input.rules, 'sale-cost');
   const collection = collectionAccount(input);
-  const journal = [
-    ...pair(ruleAccount(revenue, 'debit', collection), ruleAccount(revenue, 'credit', null), folded.revenue),
+  const journal = mergeJournalLines([
+    ...pair(ruleAccount(revenue, 'debit', collection), ruleAccount(revenue, 'credit', null), folded.revenue - folded.tax),
+    ...(folded.tax > 0 ? pair(collection, ruleAccount(findRule(input.rules, 'sale-tax') ?? defaultSaleTaxRule(), 'credit', null), folded.tax) : []),
     ...pair(ruleAccount(cost, 'debit', null), ruleAccount(cost, 'credit', null), folded.cost),
-  ];
+  ]);
   return finish(folded, journal, input.accounts);
 }
 
@@ -229,10 +232,11 @@ interface Fold {
   amount: number;
   cost: number;
   revenue: number;
+  tax: number;
 }
 
 function emptyFold(): Fold {
-  return { stock: [], effects: [], movements: [], amount: 0, cost: 0, revenue: 0 };
+  return { stock: [], effects: [], movements: [], amount: 0, cost: 0, revenue: 0, tax: 0 };
 }
 
 function foldReceipts(input: PlanInput): Fold {
@@ -246,7 +250,7 @@ function foldReceipts(input: PlanInput): Fold {
   if (amount <= 0) {
     throw new DocumentError('Receipt needs a positive amount');
   }
-  return { stock, effects, movements, amount, cost: 0, revenue: 0 };
+  return { stock, effects, movements, amount, cost: 0, revenue: 0, tax: 0 };
 }
 
 function pushReceipt(
@@ -288,11 +292,14 @@ function foldIssues(input: PlanInput, withRevenue: boolean): Fold {
   const movements: StockMovement[] = [];
   let cost = 0;
   let revenue = 0;
+  let tax = 0;
   for (const line of input.draft.lines) {
     const issued = pushIssue(stock, effects, line);
     const lineRevenue = issuedRevenue(line, withRevenue);
+    const lineTax = withRevenue ? taxIncluded(lineRevenue, line.taxRate ?? 0) : 0;
     cost = roundMoney(cost + issued.cost);
     revenue = roundMoney(revenue + lineRevenue);
+    tax = roundMoney(tax + lineTax);
     movements.push({
       productId: line.productId,
       direction: 'out',
@@ -304,7 +311,24 @@ function foldIssues(input: PlanInput, withRevenue: boolean): Fold {
   if (cost <= 0 && revenue <= 0) {
     throw new DocumentError('Issue needs a positive amount');
   }
-  return { stock, effects, movements, amount: 0, cost, revenue };
+  return { stock, effects, movements, amount: 0, cost, revenue, tax };
+}
+
+function taxIncluded(total: number, rate: number): number {
+  if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new DocumentError('Sale tax rate is invalid');
+  if (total <= 0 || rate === 0) return 0;
+  return roundMoney(total * rate / (100 + rate));
+}
+
+function mergeJournalLines(lines: readonly JournalLine[]): JournalLine[] {
+  const merged = new Map<string, JournalLine>();
+  for (const line of lines) {
+    const current = merged.get(line.accountCode) ?? { accountCode: line.accountCode, debit: 0, credit: 0 };
+    current.debit = roundMoney(current.debit + line.debit);
+    current.credit = roundMoney(current.credit + line.credit);
+    merged.set(line.accountCode, current);
+  }
+  return [...merged.values()];
 }
 
 function issuedRevenue(line: DocumentLine, withRevenue: boolean): number {
@@ -410,11 +434,19 @@ function assertCashAccount(account: AccountSeed): void {
 }
 
 function requireRule(rules: readonly PostingRuleSeed[], documentType: string): PostingRuleSeed {
-  const rule = rules.find((item) => item.documentType === documentType);
+  const rule = findRule(rules, documentType);
   if (rule === undefined) {
     throw new DocumentError(`Missing posting rule ${documentType}`);
   }
   return rule;
+}
+
+function findRule(rules: readonly PostingRuleSeed[], documentType: string): PostingRuleSeed | undefined {
+  return rules.find((item) => item.documentType === documentType);
+}
+
+function defaultSaleTaxRule(): PostingRuleSeed {
+  return { documentType: 'sale-tax', debitCode: null, creditCode: '2.01.02.001', debitUsesCollectionAccount: true, creditUsesPaymentAccount: false };
 }
 
 function ruleAccount(rule: PostingRuleSeed, side: 'debit' | 'credit', override: string | null): string {

@@ -37,7 +37,7 @@ export async function insertCompany(manager: EntityManager, company: Company): P
 }
 
 export async function insertWarehouse(manager: EntityManager, warehouse: Warehouse): Promise<void> {
-  await manager.createQueryBuilder().insert().into(WarehouseEntity).values(warehouse).execute();
+  await manager.createQueryBuilder().insert().into(WarehouseEntity).values({ ...warehouse, code: warehouse.code ?? 'BOD-001', active: warehouse.active ?? true, isDefault: warehouse.isDefault ?? true }).execute();
 }
 
 export function selectCompanies(manager: EntityManager, societyId: string): Promise<CompanyQueryRow[]> {
@@ -77,6 +77,9 @@ export function selectWarehouses(manager: EntityManager, companyId: string): Pro
     .select('warehouse.id', 'id')
     .addSelect('warehouse.companyId', 'companyId')
     .addSelect('warehouse.name', 'name')
+    .addSelect('warehouse.code', 'code')
+    .addSelect('warehouse.active', 'active')
+    .addSelect('warehouse.isDefault', 'isDefault')
     .where('warehouse.companyId = :companyId', { companyId })
     .orderBy('warehouse.name', 'ASC')
     .getRawMany<Warehouse>();

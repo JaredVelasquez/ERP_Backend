@@ -13,6 +13,7 @@ export interface ReadStockCardCommand {
   companyId: string;
   productId: string;
   code: string;
+  warehouseId?: string;
   grants: readonly ModuleGrant[];
 }
 
@@ -34,7 +35,7 @@ export class ReadStockCardUseCase {
     if (company === null) {
       throw new DocumentError('Company was not found');
     }
-    const stock = await this.ledger.loadStock(command.companyId, [resolved.product.id]);
+    const stock = await this.ledger.loadStock(command.companyId, [resolved.product.id], command.warehouseId);
     return buildStockCard({
       product: resolved.product,
       layers: stock[0]?.layers ?? [],
@@ -59,7 +60,7 @@ export class ReadStockCardUseCase {
     if (product === null) {
       throw new ProductError('Product was not found');
     }
-    if (!product.active) {
+    if (!product.active || product.itemType === 'service') {
       throw new ProductError('Product is inactive');
     }
     return { product, presentation: null, manufacturerBarcode: null };

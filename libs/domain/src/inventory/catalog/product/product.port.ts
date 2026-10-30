@@ -6,8 +6,10 @@ export interface ProductPort {
   save(product: Product): Promise<void>;
   find(companyId: string, productId: string): Promise<Product | null>;
   list(companyId: string): Promise<Product[]>;
-  listPage(companyId: string, request: PageRequest): Promise<Page<Product>>;
+  listPage(companyId: string, request: PageRequest, itemType?: CatalogItemTypeFilter): Promise<Page<Product>>;
 }
+
+export type CatalogItemTypeFilter = 'product' | 'service' | 'all';
 
 export const PRODUCT_PORT = Symbol('PRODUCT_PORT');
 

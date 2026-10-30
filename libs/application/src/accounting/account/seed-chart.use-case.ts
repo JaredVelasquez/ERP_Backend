@@ -24,13 +24,21 @@ export class SeedChartUseCase {
       return buildAccountTree(chart.accounts);
     }
     const accounts = alignAccounts(existing.accounts);
-    const rules = existing.rules.map(alignRule);
+    const rules = alignPostingRules(existing.rules);
     if (sameAccounts(existing.accounts, accounts) && sameRules(existing.rules, rules)) {
       return buildAccountTree(existing.accounts);
     }
     await this.accounting.saveChart(companyId, { ...existing, accounts, rules });
     return buildAccountTree(accounts);
   }
+}
+
+function alignPostingRules(existing: readonly PostingRuleSeed[]): PostingRuleSeed[] {
+  const rules = existing.map(alignRule);
+  for (const rule of POSTING_RULES) {
+    if (!rules.some((current) => current.documentType === rule.documentType)) rules.push({ ...rule });
+  }
+  return rules;
 }
 
 function freshChart(): CompanyChart {

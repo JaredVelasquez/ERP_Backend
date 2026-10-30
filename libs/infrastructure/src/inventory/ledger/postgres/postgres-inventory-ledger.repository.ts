@@ -18,8 +18,8 @@ export class PostgresInventoryLedgerRepository implements InventoryLedgerPort {
     return this.database.withManager((manager) => listDocuments(manager, companyId));
   }
 
-  async loadStock(companyId: string, productIds: readonly string[]): Promise<Array<{ productId: string; layers: CostLayer[] }>> {
-    return this.database.withManager((manager) => loadStock(manager, companyId, productIds));
+  async loadStock(companyId: string, productIds: readonly string[], warehouseId?: string): Promise<Array<{ productId: string; layers: CostLayer[] }>> {
+    return this.database.withManager((manager) => loadStock(manager, companyId, productIds, warehouseId));
   }
 
   async commit(change: LedgerCommit): Promise<void> {

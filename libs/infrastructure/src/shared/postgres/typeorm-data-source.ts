@@ -19,6 +19,12 @@ import {
   RefreshSessionEntity, RoleEntity, UserEntity,
 } from '@infrastructure/identity/session/postgres/entities/identity.entity';
 import { CompanyEntity, SocietyEntity, TenantEntity, WarehouseEntity } from '@infrastructure/tenancy/company/postgres/entities/tenancy.entity';
+import { FiscalAuthorizationEntity, FiscalDocumentEntity } from '@infrastructure/documents/fiscal/postgres/entities/fiscal-document.entity';
+import { DocumentTemplateEntity } from '@infrastructure/documents/document-template/postgres/document-template.entity';
+import { BusinessDocumentEntity } from '@infrastructure/documents/business-document/postgres/business-document.entity';
+import { BusinessDocumentLineEntity } from '@infrastructure/documents/business-document/postgres/business-document-line.entity';
+import { BankAccountEntity, PaymentMethodEntity } from '@infrastructure/accounting/payment-settings/postgres/entities/payment-setting.entity';
+import { AccountingPeriodEntity, BankStatementLineEntity, CompanyFiscalProfileEntity, FiscalEstablishmentEntity, PrecisionPolicyEntity } from '@infrastructure/operations/company-controls/postgres/entities/company-controls.entity';
 import {
   DocumentSignatureEntity,
   DocumentSubmissionEntity,
@@ -84,6 +90,18 @@ export function typeOrmDataSourceOptions(env: Readonly<Record<string, string | u
       InventoryDocumentEntity,
       DocumentSubmissionEntity,
       DocumentSignatureEntity,
+      FiscalAuthorizationEntity,
+      FiscalDocumentEntity,
+      DocumentTemplateEntity,
+      BusinessDocumentEntity,
+      BusinessDocumentLineEntity,
+      PaymentMethodEntity,
+      BankAccountEntity,
+      CompanyFiscalProfileEntity,
+      FiscalEstablishmentEntity,
+      PrecisionPolicyEntity,
+      AccountingPeriodEntity,
+      BankStatementLineEntity,
       UserEntity,
       RoleEntity,
       MembershipEntity,

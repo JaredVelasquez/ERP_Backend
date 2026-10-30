@@ -24,6 +24,7 @@ export class StockCardsController {
     @Query('companyId') companyId = '',
     @Query('productId') productId = '',
     @Query('code') code = '',
+    @Query('warehouseId') warehouseId = '',
   ): Promise<{ card: StockCardView }> {
     const session = await requireCompanySession(this.identity, { authorization, cookie });
     assertSameCompany(session, companyId);
@@ -32,6 +33,7 @@ export class StockCardsController {
         companyId: session.companyId,
         productId,
         code,
+        warehouseId: warehouseId || undefined,
         grants: session.grants,
       }),
     };

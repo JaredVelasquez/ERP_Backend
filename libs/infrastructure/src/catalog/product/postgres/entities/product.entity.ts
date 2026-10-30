@@ -11,6 +11,9 @@ export class ProductEntity {
   @Column('varchar', { length: 200 })
   declare name: string;
 
+  @Column('varchar', { name: 'item_type', length: 20, default: 'product' })
+  declare itemType: 'product' | 'service';
+
   @Column('varchar', { length: 100 })
   declare category: string;
 

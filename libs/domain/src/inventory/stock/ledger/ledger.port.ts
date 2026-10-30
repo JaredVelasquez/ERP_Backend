@@ -4,6 +4,7 @@ import type { CostLayer } from '@domain/inventory/catalog/costing/costing';
 export interface ConfirmedDocument {
   id: string;
   companyId: string;
+  warehouseId?: string;
   type: DocumentKind | 'void';
   status: 'confirmed' | 'voided';
   idempotencyKey: string;
@@ -18,13 +19,13 @@ export interface ConfirmedDocument {
 export interface LedgerCommit {
   document: ConfirmedDocument;
   voidedDocumentId: string | null;
-  stock: Array<{ companyId: string; productId: string; layers: CostLayer[] }>;
+  stock: Array<{ companyId: string; warehouseId?: string; productId: string; layers: CostLayer[] }>;
 }
 
 export interface InventoryLedgerPort {
   findByIdempotency(companyId: string, key: string): Promise<ConfirmedDocument | null>;
   find(companyId: string, documentId: string): Promise<ConfirmedDocument | null>;
-  loadStock(companyId: string, productIds: readonly string[]): Promise<Array<{ productId: string; layers: CostLayer[] }>>;
+  loadStock(companyId: string, productIds: readonly string[], warehouseId?: string): Promise<Array<{ productId: string; layers: CostLayer[] }>>;
   listDocuments(companyId: string): Promise<ConfirmedDocument[]>;
   commit(change: LedgerCommit): Promise<void>;
 }

@@ -12,6 +12,7 @@ import { PRODUCT_PORT, type ProductPort } from '@domain/inventory/catalog/produc
 export interface CreateProductInput {
   companyId: string;
   name: string;
+  itemType?: 'product' | 'service';
   category: string;
   baseUnit: string;
   tracksExpiry: boolean;
@@ -36,6 +37,7 @@ export class CreateProductUseCase {
       id: randomUUID(),
       companyId: input.companyId,
       name: input.name.trim(),
+      itemType: input.itemType ?? 'product',
       category: shelf.category,
       supplier: shelf.supplier,
       baseUnit: input.baseUnit.trim(),
@@ -64,6 +66,9 @@ async function assertCanCreateSellableProduct(
 }
 
 function assertProduct(input: CreateProductInput): void {
+  if (input.itemType !== undefined && input.itemType !== 'product' && input.itemType !== 'service') {
+    throw new ProductError('Item type is not supported');
+  }
   if (input.companyId.trim() === '' || input.name.trim() === '' || input.baseUnit.trim() === '') {
     throw new ProductError('Company, name, and base unit are required');
   }
@@ -72,5 +77,8 @@ function assertProduct(input: CreateProductInput): void {
   }
   for (const presentation of input.presentations) {
     assertPresentation(presentation);
+  }
+  if (input.itemType === 'service' && input.presentations.some((presentation) => presentation.purchasable || !presentation.sellable || presentation.salePrice === null)) {
+    throw new ProductError('A service needs a sale price and cannot be purchased as inventory');
   }
 }

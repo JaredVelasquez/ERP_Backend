@@ -23,7 +23,7 @@ export class DashboardUseCase {
         ...period,
         documents,
         prices,
-        activeProductIds: products.filter((product) => product.active).map((product) => product.id),
+        activeProductIds: products.filter((product) => product.active && product.itemType !== 'service').map((product) => product.id),
       }),
       inventory: inventoryValue(stock.flatMap((row) => row.layers)),
     };

@@ -76,15 +76,19 @@ async function applyLegacySchemaMigrations(runner: ReturnType<DataSource['create
     WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT IN ('schema_migrations', 'typeorm_migrations')`) as { count: number }[];
   const registered = await runner.query('SELECT version, checksum FROM schema_migrations') as { version: string; checksum: string }[];
   const registeredByVersion = new Map(registered.map((migration) => [migration.version, migration.checksum]));
-  for (const file of files) await verifyLegacyMigration(directory, file, registeredByVersion, businessTables[0].count > 0);
+  const lastRegisteredIndex = files.reduce((lastIndex, file, index) => registeredByVersion.has(file) ? index : lastIndex, -1);
+  for (const [index, file] of files.entries()) {
+    const isAppendOnlyAddition = index > lastRegisteredIndex && files.slice(0, index).every((previous) => registeredByVersion.has(previous));
+    await verifyLegacyMigration(directory, file, registeredByVersion, businessTables[0].count > 0, isAppendOnlyAddition);
+  }
   for (const file of files) await applyLegacyMigration(runner, directory, file);
 }
 
-async function verifyLegacyMigration(directory: string, file: string, registered: ReadonlyMap<string, string>, hasBusinessTables: boolean): Promise<void> {
+async function verifyLegacyMigration(directory: string, file: string, registered: ReadonlyMap<string, string>, hasBusinessTables: boolean, isAppendOnlyAddition: boolean): Promise<void> {
   const source = await readFile(join(directory, file), 'utf8');
   const checksum = createHash('sha256').update(source).digest('hex');
   const appliedChecksum = registered.get(file);
-  assertSafeLegacyMigration(file, checksum, appliedChecksum, hasBusinessTables);
+  assertSafeLegacyMigration(file, checksum, appliedChecksum, hasBusinessTables, isAppendOnlyAddition);
 }
 
 async function applyLegacyMigration(runner: ReturnType<DataSource['createQueryRunner']>, directory: string, file: string): Promise<void> {

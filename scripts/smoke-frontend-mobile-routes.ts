@@ -26,6 +26,7 @@ interface BrowserLocator {
   waitFor(options?: { timeout?: number; state?: 'visible' | 'hidden' }): Promise<void>;
   nth(index: number): BrowserLocator;
   filter(options: { hasText: string }): BrowserLocator;
+  count(): Promise<number>;
   locator(selector: string): BrowserLocator;
 }
 interface BrowserPage {
@@ -43,8 +44,8 @@ interface PlaywrightModule { chromium: { launch(options: { channel: string; head
 
 const routes = [
   '/dashboard', '/products', '/scan', '/inventory', '/prices', '/accounting', '/accounting/journal-entries',
-  '/reports', '/imports', '/documents', '/settings', '/settings/users', '/settings/prices',
-  '/settings/documents', '/settings/assistant', '/settings/integrations',
+  '/reports', '/imports', '/documents', '/business-documents', '/settings', '/settings/users', '/settings/prices',
+  '/settings/documents', '/settings/assistant', '/settings/integrations', '/settings/templates',
 ];
 
 async function main(): Promise<void> {
@@ -144,8 +145,9 @@ async function main(): Promise<void> {
     await page.goto('http://127.0.0.1:5174/scan', { waitUntil: 'domcontentloaded' });
     await page.locator('#scan-code').fill(`missing-${suffix}`);
     await page.locator('#scan-code').press('Enter');
+    await page.locator('[role="status"]').filter({ hasText: 'no está en el catálogo' }).waitFor({ timeout: 10_000 });
     const unknownNotice = await page.locator('[role="status"]').textContent();
-    if (!unknownNotice?.includes('no está en el catálogo')) throw new Error('An unknown barcode did not show a clear no-change warning');
+    if (!unknownNotice?.includes('no está en el catálogo')) throw new Error(`An unknown barcode did not show a clear no-change warning: ${unknownNotice ?? '<empty>'}`);
     await page.locator('#scan-code').fill(testProductName);
     await page.locator('#scan-code').press('Enter');
     await page.locator('.choice-list button').waitFor({ timeout: 10_000 });
@@ -218,6 +220,7 @@ async function main(): Promise<void> {
     }
     if (overflows.length > 0) throw new Error(`Horizontal overflow at 390px: ${overflows.join(', ')}`);
     if (errors.length > 0) throw new Error(`Browser runtime errors: ${errors.join(' | ')}`);
+    await exerciseDocumentCenter(page, suffix);
     process.stdout.write('Product creation/search, unknown and valid barcode scans, Enter in quantity, name-based sale, no-stock rejection, inventory receipt and valid sale passed.\n');
     process.stdout.write(`Chrome visited ${routes.length} ERP routes at 390px with no document overflow or runtime exceptions.\n`);
   } finally {
@@ -247,6 +250,8 @@ async function main(): Promise<void> {
     }
     if (userId) {
       await database.query('BEGIN');
+      await database.query('DELETE FROM business_documents WHERE created_by = $1', [userId]);
+      await database.query('DELETE FROM document_templates WHERE created_by = $1', [userId]);
       await database.query('DELETE FROM table_layouts WHERE user_id = $1', [userId]);
       await database.query('DELETE FROM dashboard_layouts WHERE user_id = $1', [userId]);
       await database.query('DELETE FROM ui_preferences WHERE user_id = $1', [userId]);
@@ -254,6 +259,8 @@ async function main(): Promise<void> {
       await database.query('DELETE FROM mcp_tokens WHERE user_id = $1', [userId]);
       await database.query('DELETE FROM manual_journal_entry_lines WHERE entry_id IN (SELECT id FROM manual_journal_entries WHERE created_by = $1)', [userId]);
       await database.query('DELETE FROM manual_journal_entries WHERE created_by = $1', [userId]);
+      await database.query('DELETE FROM business_documents WHERE created_by = $1', [userId]);
+      await database.query('DELETE FROM document_templates WHERE created_by = $1', [userId]);
       await database.query('DELETE FROM refresh_sessions WHERE family_id IN (SELECT id FROM auth_session_families WHERE user_id = $1)', [userId]);
       await database.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
       await database.query('DELETE FROM auth_session_families WHERE user_id = $1', [userId]);
@@ -265,6 +272,69 @@ async function main(): Promise<void> {
     await sql.close?.();
     await database.end();
   }
+}
+
+async function exerciseDocumentCenter(page: BrowserPage, suffix: string): Promise<void> {
+  const templateName = `Factura smoke ${suffix}`;
+  await page.goto('http://127.0.0.1:5174/settings/templates', { waitUntil: 'domcontentloaded' });
+  await page.locator('.dc-type-card').filter({ hasText: 'Factura de prueba' }).click();
+  const activeInvoiceTemplates = await page.locator('.dc-template-version').filter({ hasText: 'Publicada' }).count();
+  if (activeInvoiceTemplates === 0) {
+    const missingFormats = page.locator('.dc-bulk-standard button');
+    if (await missingFormats.count() > 0) {
+      await missingFormats.click();
+      await page.locator('.dc-type-card').filter({ hasText: 'Cotización' }).filter({ hasText: '1 publicadas' }).waitFor({ timeout: 20_000 });
+    }
+    await page.locator('.dc-type-card').filter({ hasText: 'Factura de prueba' }).click();
+    await page.locator('input[name="name"]').fill(templateName);
+    await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click();
+    const version = page.locator('.dc-template-version').filter({ hasText: templateName });
+    await version.waitFor({ timeout: 10_000 });
+    await version.locator('button').click();
+    await page.locator('.dc-template-version').filter({ hasText: 'Publicada' }).waitFor({ timeout: 10_000 });
+  }
+
+  await page.goto('http://127.0.0.1:5174/business-documents', { waitUntil: 'domcontentloaded' });
+  await page.locator('.dc-type-card').filter({ hasText: 'Factura de prueba' }).click();
+  await page.locator('select[name="templateId"]').waitFor({ timeout: 10_000 });
+  await page.locator('input[name="recipientName"]').fill(`Cliente ficticio ${suffix}`);
+  await page.locator('.dc-line-editor input').nth(0).fill('Artículo de prueba');
+  await page.locator('.dc-line-editor input').nth(2).fill('125.50');
+  await page.getByRole('button', { name: 'Crear documento de prueba', exact: true }).click();
+  const generated = page.locator('.dc-document-row').filter({ hasText: `Cliente ficticio ${suffix}` });
+  await generated.waitFor({ timeout: 10_000 });
+  await page.locator('.dc-watermark').waitFor({ timeout: 10_000 });
+  const logoSource = await page.locator('.dc-paper img').getAttribute('src');
+  const sourceDocumentNumber = await page.locator('.dc-layout-metadata strong').nth(0).textContent();
+  const preview = await page.locator('.dc-paper').textContent();
+  if (!logoSource || !preview?.includes('NO VÁLIDO') || !preview.includes('125.50')) {
+    throw new Error(`The development document preview did not show the watermark and calculated total: ${preview ?? '<empty>'}`);
+  }
+  await page.locator('.dc-type-card').filter({ hasText: 'Nota de crédito' }).click();
+  await page.locator('input[name="relatedDocumentNumber"]').fill(sourceDocumentNumber ?? '');
+  await page.locator('input[name="reason"]').fill('Ajuste ficticio de prueba');
+  await page.locator('input[name="recipientName"]').fill(`Cliente nota ${suffix}`);
+  await page.getByRole('button', { name: 'Crear documento de prueba', exact: true }).click();
+  await page.locator('.dc-document-row').filter({ hasText: `Cliente nota ${suffix}` }).waitFor({ timeout: 10_000 });
+  const notePreview = await page.locator('.dc-paper').textContent();
+  if (!sourceDocumentNumber || !notePreview?.includes(sourceDocumentNumber) || !notePreview.includes('Ajuste ficticio de prueba')) {
+    throw new Error('The credit note preview did not preserve its source and adjustment reason');
+  }
+  await page.goto('http://127.0.0.1:5174/settings/templates', { waitUntil: 'domcontentloaded' });
+  await page.locator('.dc-type-card').filter({ hasText: 'Factura de prueba' }).click();
+  await page.getByRole('button', { name: 'Crear desde cero', exact: true }).click();
+  await page.locator('.dc-builder-screen').waitFor({ timeout: 10_000 });
+  await page.locator('.dc-builder-options label:first-child input').fill(templateName);
+  const saveButton = page.locator('.dc-builder-screen button').filter({ hasText: 'Guardar borrador' });
+  if (await saveButton.count() === 0) {
+    const actionButtons = page.locator('.dc-builder-screen button');
+    const labels: string[] = [];
+    for (let index = 0; index < await actionButtons.count(); index += 1) labels.push((await actionButtons.nth(index).textContent())?.trim() ?? '');
+    throw new Error(`The visual template builder did not expose its save action: ${labels.filter(Boolean).join(' · ')}`);
+  }
+  await saveButton.click();
+  await page.locator('.dc-template-version').filter({ hasText: templateName }).waitFor({ timeout: 10_000 });
+  process.stdout.write('Company formal templates, visual canvas draft creation, PostgreSQL invoice/credit note rendering, relation validation and print preview passed.\n');
 }
 
 async function verifyLayoutPersistence(layouts: PostgresLayoutRepository, companyId: string, userId: string): Promise<void> {
@@ -280,7 +350,7 @@ async function verifyLayoutPersistence(layouts: PostgresLayoutRepository, compan
   }
   const dashboard = await layouts.saveDashboard({
     id: randomUUID(), companyId, userId,
-    widgets: [{ key: 'sales', visible: false, x: 0, y: 2, w: 2, h: 1 }],
+    widgets: [{ key: 'sales', visible: false, x: 0, y: 2, w: 2, h: 1, chartType: 'bar' }],
   });
   const savedDashboard = await layouts.findDashboard(companyId, userId);
   if (savedDashboard?.id !== dashboard.id || savedDashboard.widgets[0]?.visible !== false) {

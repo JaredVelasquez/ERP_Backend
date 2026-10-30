@@ -246,7 +246,7 @@ Plantilla HTML administrable. Formulario:
 - Firma dibujada en pantalla.
 - Referencia bancaria: el número que muestra el banco. Puede ir vacía en el borrador. Al confirmar o descargar es obligatoria y sale en el PDF como "Referencia bancaria".
 - Enlace opcional al traslado de dinero ya contabilizado (Caja, POS, transferencias o bancos). El comprobante y el traslado son de la misma empresa. Un traslado de otra empresa se rechaza. Firmar no crea otro asiento: el traslado sigue siendo el asiento.
-- Confirmar es idempotente. Anular requiere una solicitud con motivo y aprobaci�n del due�o o del encargado de anulaciones designado en Configuraci�n. El solicitante no puede aprobar su propia solicitud. La resoluci�n conserva qui�n, cu�ndo y la decisi�n; deja visibles la referencia y el enlace, y no borra ni reversa el traslado.
+- Confirmar es idempotente. Anular requiere una solicitud con motivo y aprobaci�n del due�o o del encargado de anulaciones designado en Configuraci�n. El solicitante no puede aprobar su propia solicitud. La resoluci�n conserva qui�n, cu�ndo y la decisi�n; deja visibles la referencia y el enlace, y no borra ni reversa el traslado.
 
 Se guarda el formulario, la firma y ese enlace. La descarga arma el PDF. La firma es un trazo, no una firma electrónica certificada. El papel original trae seis copias; la descarga genera una sola copia ampliada, por decisión del usuario.
 
@@ -443,8 +443,16 @@ Cámara, iOS, plugin nativo de escáner, punto de venta, fiado, factura SAR, rec
 - Los PDF descargables de comprobantes confirmados se guardan en el bucket S3 privado `erp`, con prefijo `S3_VOUCHER_PREFIX/{comprobante}/`. No se emiten enlaces públicos; el ERP entrega el archivo tras validar sesión y pertenencia a la empresa.
 ## 14. Conversaciones del asistente
 
-- El asistente ofrece una vista de conversaci�n en pantalla completa con historial paginado y creaci�n de nuevas conversaciones. El historial se persiste por usuario y empresa, y solo su propietario puede listarlo o abrirlo. Se guardan mensajes de texto y respuestas, nunca bytes de im�genes, videos, documentos ni audio.
+- El asistente ofrece una vista de conversaci�n en pantalla completa con historial paginado y creaci�n de nuevas conversaciones. El historial se persiste por usuario y empresa, y solo su propietario puede listarlo o abrirlo. Se guardan mensajes de texto y respuestas, nunca bytes de im�genes, videos, documentos ni audio.
 
 ## Propuesta de fase 2 (pendiente de aceptación)
 
 El alcance fiscal y contable propuesto está en `docs/PHASE_2_PLAN.md`. No modifica aún los requisitos aprobados de la fase 1 ni autoriza configuración fiscal por defecto.
+
+## Plantillas fiscales de fase 2
+El alcance propuesto de T-051 está descrito en `docs/PHASE_2_PLAN.md`: formatos predefinidos y personalizados por empresa, con editor visual, validaciones legales y versionado inmutable.
+
+Los documentos fiscales generados se reconstruyen bajo demanda con sus snapshots, plantilla y autorización/CAI históricos; los archivos generados no se guardan en buckets.
+
+### Política de fase 2: documentos y archivos
+Los PDFs generados por el ERP se regeneran bajo demanda y no se guardan en R2. Los originales no regenerables y assets de plantillas se guardan en Cloudflare R2 privado. PostgreSQL conserva solo metadatos, hashes y claves de objetos; nunca binarios. Esta política reemplaza el almacenamiento de PDFs generados y la propuesta anterior de guardar adjuntos binarios en la base de datos.

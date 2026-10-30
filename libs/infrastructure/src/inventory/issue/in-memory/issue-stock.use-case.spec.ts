@@ -43,6 +43,7 @@ describe('issue stock', () => {
       draft: {
         id: 'sale-1',
         companyId: 'company-1',
+        warehouseId: 'warehouse-1',
         type: 'sale',
         idempotencyKey: 'sale-1',
         paymentAccountCode: null,
@@ -133,6 +134,7 @@ async function receive(context: Awaited<ReturnType<typeof fixture>>, productId: 
     draft: {
       id: `buy-${productId}`,
       companyId: 'company-1',
+      warehouseId: 'warehouse-1',
       type: 'purchase',
       idempotencyKey: `buy-${productId}`,
       paymentAccountCode: '1.01.01.001',

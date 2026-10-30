@@ -70,4 +70,13 @@ export class WarehouseEntity {
 
   @Column('varchar', { length: 200 })
   declare name: string;
+
+  @Column('varchar', { length: 20 })
+  declare code: string;
+
+  @Column('boolean', { default: true })
+  declare active: boolean;
+
+  @Column('boolean', { name: 'is_default', default: false })
+  declare isDefault: boolean;
 }

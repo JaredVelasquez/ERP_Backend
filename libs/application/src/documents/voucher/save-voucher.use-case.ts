@@ -69,22 +69,7 @@ export class DownloadVoucherUseCase {
       throw new VoucherError('Voucher was not found');
     }
     assertDownloadable(voucher);
-    const pdf = renderVoucherPdf(voucher);
-    if (this.storage !== undefined) {
-      const key = `${voucherPrefix()}/${voucher.id}/comprobante.pdf`;
-      await this.storage.put({
-        key,
-        body: pdf,
-        contentType: 'application/pdf',
-      });
-      try {
-        await this.vouchers.save({ ...voucher, voucherFileKey: key });
-      } catch (error) {
-        await this.storage.delete(key).catch(() => undefined);
-        throw error;
-      }
-    }
-    return pdf;
+    return renderVoucherPdf(voucher);
   }
 
   async attachBankReceipt(
@@ -118,17 +103,22 @@ export class DownloadVoucherUseCase {
     Promise<{ body: Buffer; contentType: string; fileName: string } | null> {
     const voucher = await this.vouchers.find(companyId, voucherId);
     if (voucher === null) throw new VoucherError('Voucher was not found');
+    if (kind === 'voucher') {
+      assertDownloadable(voucher);
+      return {
+        body: renderVoucherPdf(voucher),
+        contentType: 'application/pdf',
+        fileName: `comprobante-${voucher.id}.pdf`,
+      };
+    }
     if (this.storage === undefined) return null;
-    if (kind === 'voucher' && voucher.voucherFileKey === null) await this.execute(companyId, voucherId);
-    const key = kind === 'voucher'
-      ? voucher.voucherFileKey ?? `${voucherPrefix()}/${voucher.id}/comprobante.pdf`
-      : voucher.bankReceiptFileKey;
+    const key = voucher.bankReceiptFileKey;
     if (key === null) return null;
     const stored = await this.storage.get(key);
     if (stored === null) return null;
     return {
       ...stored,
-      fileName: kind === 'voucher' ? `comprobante-${voucher.id}.pdf` : voucher.bankReceiptFileName ?? 'comprobante-bancario',
+      fileName: voucher.bankReceiptFileName ?? 'comprobante-bancario',
     };
   }
 }

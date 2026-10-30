@@ -10,7 +10,7 @@ export interface StockCardView {
   resolvedUnit: string | null;
   baseQuantity: number;
   unitCost: number | null;
-  presentations: Array<{ unit: string; factor: number; salePrice: number | null }>;
+  presentations: Array<{ unit: string; factor: number; salePrice: number | null; purchasable: boolean; sellable: boolean }>;
 }
 
 export function buildStockCard(input: {
@@ -33,5 +33,11 @@ export function buildStockCard(input: {
 }
 
 function cardPresentation(presentation: Presentation): StockCardView['presentations'][number] {
-  return { unit: presentation.unit, factor: presentation.factor, salePrice: presentation.salePrice };
+  return {
+    unit: presentation.unit,
+    factor: presentation.factor,
+    salePrice: presentation.salePrice,
+    purchasable: presentation.purchasable,
+    sellable: presentation.sellable,
+  };
 }

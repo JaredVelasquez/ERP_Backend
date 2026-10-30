@@ -10,6 +10,7 @@ import { CompanyIdentityFilter } from '@presentation/http/identity/session/compa
 
 interface ConfirmBody {
   companyId: string;
+  warehouseId?: string;
   type: DocumentKind;
   idempotencyKey: string;
   receivedAt: string;
@@ -40,8 +41,13 @@ export class InventoryDocumentsController {
     if (company === null) {
       throw new DocumentError('Company was not found');
     }
+    const warehouses = await this.companies.listWarehouses(body.companyId);
+    const warehouse = body.warehouseId === undefined
+      ? warehouses.find((item) => item.isDefault)
+      : warehouses.find((item) => item.id === body.warehouseId && item.active);
+    if (warehouse === undefined) throw new DocumentError('Warehouse was not found or inactive');
     const document = await this.confirmDocument.execute({
-      draft: toDraft(body),
+      draft: toDraft(body, warehouse.id),
       companyCostingMethod: company.costingMethod,
       receivedAt: body.receivedAt,
     });
@@ -57,10 +63,11 @@ export class InventoryDocumentsController {
   }
 }
 
-function toDraft(body: ConfirmBody): DraftDocument {
+function toDraft(body: ConfirmBody, warehouseId: string): DraftDocument {
   return {
     id: randomUUID(),
     companyId: body.companyId,
+    warehouseId,
     type: body.type,
     idempotencyKey: body.idempotencyKey,
     paymentAccountCode: body.paymentAccountCode ?? null,
