@@ -4,6 +4,7 @@ import { ImportCatalogUseCase } from '@application/inventory/catalog/import/impo
 import { ImportCountUseCase } from '@application/inventory/catalog/import/import-count.use-case';
 import { IssueStockUseCase } from '@application/inventory/stock/issue/issue-stock.use-case';
 import { ReadStockCardUseCase } from '@application/inventory/stock/report/read-stock-card.use-case';
+import { SetProductCostingMethodUseCase } from '@application/inventory/catalog/costing/set-product-costing-method.use-case';
 import { TransferStockUseCase } from '@application/inventory/stock/transfer/transfer-stock.use-case';
 import { VoidDocumentUseCase } from '@application/inventory/stock/document/void-document.use-case';
 import { CreateJournalEntryUseCase } from '@application/accounting/journal-entry/create-journal-entry.use-case';
@@ -29,18 +30,20 @@ import { InventoryDocumentsController } from '@presentation/http/inventory/docum
 import { InventoryIssuesController } from '@presentation/http/inventory/issue/inventory-issues.controller';
 import { InventoryTransfersController } from '@presentation/http/inventory/transfer/inventory-transfers.controller';
 import { JournalEntriesController } from '@presentation/http/accounting/journal-entry/journal-entries.controller';
+import { ProductCostingController } from '@presentation/http/inventory/costing/product-costing.controller';
 import { ReportsController } from '@presentation/http/accounting/reports/reports.controller';
 import { StockCardsController } from '@presentation/http/inventory/report/stock-cards.controller';
 import { TenancyModule } from '@composition/tenancy.module';
 
 @Module({
   imports: [IdentityModule, CatalogModule, TenancyModule],
-  controllers: [InventoryDocumentsController, InventoryIssuesController, InventoryTransfersController, StockCardsController, ReportsController, ImportsController, JournalEntriesController],
+  controllers: [InventoryDocumentsController, InventoryIssuesController, InventoryTransfersController, ProductCostingController, StockCardsController, ReportsController, ImportsController, JournalEntriesController],
   providers: [
     ConfirmDocumentUseCase,
     VoidDocumentUseCase,
     IssueStockUseCase,
     TransferStockUseCase,
+    SetProductCostingMethodUseCase,
     ReadStockCardUseCase,
     DashboardUseCase,
     ReadReportsUseCase,
@@ -59,6 +62,7 @@ import { TenancyModule } from '@composition/tenancy.module';
     VoidDocumentUseCase,
     IssueStockUseCase,
     TransferStockUseCase,
+    SetProductCostingMethodUseCase,
     ReadStockCardUseCase,
     DashboardUseCase,
     ReadReportsUseCase,

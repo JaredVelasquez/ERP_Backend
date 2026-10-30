@@ -13,6 +13,7 @@ import {
 } from '@application/inventory/catalog/pricing/price-workflow.use-cases';
 import { PRICE_WORKFLOW_PORT } from '@domain/inventory/catalog/pricing/price-workflow.port';
 import { PRICE_PORT } from '@domain/inventory/catalog/product/price.port';
+import { COSTING_POLICY_PORT } from '@domain/inventory/catalog/costing/costing-policy.port';
 import { PDF_PORT } from '@domain/inventory/catalog/barcode-sheet/pdf.port';
 import { BARCODE_PORT, PRODUCT_PORT } from '@domain/inventory/catalog/product/product.port';
 import { Code128BarcodeAdapter } from '@infrastructure/catalog/barcode-sheet/barcode/code128-barcode.adapter';
@@ -61,12 +62,14 @@ import { TenancyModule } from '@composition/tenancy.module';
       inject: [PRODUCT_PORT],
     },
     { provide: PRICE_PORT, useExisting: PRODUCT_PORT },
+    { provide: COSTING_POLICY_PORT, useExisting: PRODUCT_PORT },
     { provide: BARCODE_PORT, useClass: Code128BarcodeAdapter },
     { provide: PDF_PORT, useClass: SheetPdfAdapter },
   ],
   exports: [
     PRODUCT_PORT,
     PRICE_PORT,
+    COSTING_POLICY_PORT,
     CreateProductUseCase,
     ListProductsUseCase,
     ListPriceHistoryUseCase,

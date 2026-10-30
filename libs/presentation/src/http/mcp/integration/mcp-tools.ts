@@ -21,6 +21,8 @@ import { ImportCatalogUseCase } from '@application/inventory/catalog/import/impo
 import { ImportCountUseCase } from '@application/inventory/catalog/import/import-count.use-case';
 import { IssueStockUseCase } from '@application/inventory/stock/issue/issue-stock.use-case';
 import { TransferStockUseCase } from '@application/inventory/stock/transfer/transfer-stock.use-case';
+import { SetProductCostingMethodUseCase } from '@application/inventory/catalog/costing/set-product-costing-method.use-case';
+import { COSTING_METHODS, type CostingMethod } from '@domain/inventory/catalog/costing/costing';
 import { PreviewBarcodeUseCase } from '@application/inventory/catalog/barcode-sheet/preview-barcode.use-case';
 import { ReadStockCardUseCase } from '@application/inventory/stock/report/read-stock-card.use-case';
 import { RenderBarcodeSheetUseCase } from '@application/inventory/catalog/barcode-sheet/render-barcode-sheet.use-case';
@@ -40,7 +42,6 @@ import { McpError } from '@domain/mcp/tool-catalog/tool-catalog';
 import type { McpTokenPort } from '@domain/mcp/integration/mcp.port';
 import type { SessionRecord } from '@domain/identity/session/session.port';
 import type { CompanyPort } from '@domain/tenancy/company/company.port';
-import type { CostingMethod } from '@domain/inventory/catalog/costing/costing';
 import { CreateCompanyUseCase } from '@application/tenancy/company/create-company.use-case';
 import { CreateSocietyUseCase } from '@application/tenancy/company/create-society.use-case';
 import { CreateTenantUseCase } from '@application/tenancy/company/create-tenant.use-case';
@@ -72,6 +73,7 @@ export interface McpToolDeps {
   readStockCard: ReadStockCardUseCase;
   issueStock: IssueStockUseCase;
   transferStock: TransferStockUseCase;
+  setProductCostingMethod: SetProductCostingMethodUseCase;
   listPrices: ListCommercialPricesUseCase;
   listPriceProposals: ListPriceProposalsUseCase;
   listCommercialPriceHistory: ListCommercialPriceHistoryUseCase;
@@ -215,6 +217,16 @@ export function buildMcpTools(deps: McpToolDeps): McpToolHandler[] {
         selectedLayerId: optionalText(input.selectedLayerId),
       }),
     })),
+    tool('set-product-costing-method', 'session', 'inventory', 'edit', async (session, input) => {
+      await deps.setProductCostingMethod.execute({
+        companyId: requireSession(session).companyId,
+        productId: text(input, 'productId'),
+        costingMethod: readCostingMethodOrNull(input.costingMethod),
+        reason: text(input, 'reason'),
+        actorId: requireSession(session).userId,
+      });
+      return { accepted: true };
+    }),
     tool('list-commercial-prices', 'session', 'prices', 'view', async (session, input) =>
       deps.listPrices.execute(requireSession(session).companyId, numberValue(input, 'page'), numberValue(input, 'pageSize'), optionalText(input.search) ?? ''),
     ),
@@ -602,6 +614,16 @@ function optionalText(value: unknown): string | null {
     return null;
   }
   return value;
+}
+
+function readCostingMethodOrNull(value: unknown): CostingMethod | null {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null;
+  }
+  if ((COSTING_METHODS as readonly string[]).includes(value)) {
+    return value as CostingMethod;
+  }
+  throw new McpError('Unknown costing method');
 }
 
 function readRole(value: unknown): MembershipRole {

@@ -1,5 +1,6 @@
 import type { EntityManager } from 'typeorm';
 import { randomUUID } from 'node:crypto';
+import { CostingMethodChangeError } from '@domain/inventory/catalog/costing/costing';
 import type { AccountingPeriod, BankStatementLine, CompanyControls, FiscalEstablishment, FiscalProfile, PrecisionPolicy, SaveCompanyControls, WarehouseControl } from '@domain/operations/company-controls/company-controls';
 import { CompanyEntity, WarehouseEntity } from '@infrastructure/tenancy/company/postgres/entities/tenancy.entity';
 import { AccountingPeriodEntity, BankStatementLineEntity, CompanyFiscalProfileEntity, FiscalEstablishmentEntity, PrecisionPolicyEntity } from './entities/company-controls.entity';
@@ -21,6 +22,7 @@ export async function readControls(manager: EntityManager, companyId: string): P
 export async function saveControls(manager: EntityManager, companyId: string, actorId: string, input: SaveCompanyControls): Promise<void> {
   const company = await manager.createQueryBuilder(CompanyEntity, 'company').setLock('pessimistic_write').where('company.id = :companyId', { companyId }).getOneOrFail();
   if (company.costingMethod !== input.costingMethod) {
+    await assertNoDefaultCostedStock(manager, companyId);
     await manager.createQueryBuilder().insert().into('company_costing_policy_history').values({ id: randomUUID(), company_id: companyId, previous_method: company.costingMethod, new_method: input.costingMethod, changed_by: actorId, reason: input.costingChangeReason }).execute();
     await manager.createQueryBuilder().update(CompanyEntity).set({ costingMethod: input.costingMethod }).where('id = :companyId', { companyId }).execute();
   }
@@ -58,6 +60,19 @@ async function assertCanDeactivate(manager: EntityManager, companyId: string, wa
   const warehouse = await manager.createQueryBuilder(WarehouseEntity, 'warehouse')
     .where('warehouse.companyId = :companyId AND warehouse.id = :warehouseId', { companyId, warehouseId }).getOne();
   if (warehouse?.isDefault) throw new Error('Cannot deactivate the default warehouse');
+}
+
+async function assertNoDefaultCostedStock(manager: EntityManager, companyId: string): Promise<void> {
+  const found = await manager.createQueryBuilder()
+    .select('1', 'found')
+    .from('cost_layers', 'layer')
+    .innerJoin('products', 'product', 'product.id = layer.product_id')
+    .where('layer.company_id = :companyId', { companyId })
+    .andWhere('product.costing_method IS NULL')
+    .andWhere('layer.quantity > 0')
+    .limit(1)
+    .getRawOne<{ found: number }>();
+  if (found) throw new CostingMethodChangeError();
 }
 
 export async function insertPeriod(manager: EntityManager, companyId: string, period: AccountingPeriod): Promise<void> {

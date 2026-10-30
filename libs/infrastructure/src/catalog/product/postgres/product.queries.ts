@@ -1,7 +1,7 @@
 import type { EntityManager } from 'typeorm';
 import type { ProductSort } from '@domain/inventory/catalog/product/product-sort';
 import type { CatalogItemTypeFilter } from '@domain/inventory/catalog/product/product.port';
-import { PriceChangeEntity, PresentationEntity, ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
+import { CostingPolicyChangeEntity, PriceChangeEntity, PresentationEntity, ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
 
 export async function readProducts(manager: EntityManager, companyId: string, productId?: string): Promise<ProductEntity[]> {
   const query = manager.getRepository(ProductEntity).createQueryBuilder('product')
@@ -76,6 +76,25 @@ export async function readPriceHistory(manager: EntityManager, companyId: string
     .addOrderBy('change.id', 'ASC');
   if (productId !== undefined) query.andWhere('change.productId = :productId', { productId });
   return query.getMany();
+}
+
+export async function changeProductCostingMethod(manager: EntityManager, productId: string, newMethod: string | null, change: CostingPolicyChangeEntity): Promise<boolean> {
+  const updated = await manager.getRepository(ProductEntity).createQueryBuilder()
+    .update(ProductEntity)
+    .set({ costingMethod: newMethod })
+    .where('id = :productId', { productId })
+    .execute();
+  if (!updated.affected) return false;
+  await manager.getRepository(CostingPolicyChangeEntity).insert(change);
+  return true;
+}
+
+export async function readProductCostingHistory(manager: EntityManager, companyId: string, productId: string): Promise<CostingPolicyChangeEntity[]> {
+  return manager.getRepository(CostingPolicyChangeEntity).createQueryBuilder('change')
+    .where('change.companyId = :companyId AND change.productId = :productId', { companyId, productId })
+    .orderBy('change.changedAt', 'DESC')
+    .addOrderBy('change.id', 'ASC')
+    .getMany();
 }
 
 export async function readProductBarcodes(manager: EntityManager, companyId: string): Promise<string[]> {

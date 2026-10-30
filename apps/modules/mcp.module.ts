@@ -19,6 +19,7 @@ import { ImportCatalogUseCase } from '@application/inventory/catalog/import/impo
 import { ImportCountUseCase } from '@application/inventory/catalog/import/import-count.use-case';
 import { IssueStockUseCase } from '@application/inventory/stock/issue/issue-stock.use-case';
 import { TransferStockUseCase } from '@application/inventory/stock/transfer/transfer-stock.use-case';
+import { SetProductCostingMethodUseCase } from '@application/inventory/catalog/costing/set-product-costing-method.use-case';
 import { PreviewBarcodeUseCase } from '@application/inventory/catalog/barcode-sheet/preview-barcode.use-case';
 import { ReadStockCardUseCase } from '@application/inventory/stock/report/read-stock-card.use-case';
 import { RenderBarcodeSheetUseCase } from '@application/inventory/catalog/barcode-sheet/render-barcode-sheet.use-case';
@@ -96,6 +97,7 @@ import { ReadUiPreferencesUseCase, SaveUiPreferencesUseCase } from '@application
         readStockCard: ReadStockCardUseCase,
         issueStock: IssueStockUseCase,
         transferStock: TransferStockUseCase,
+        setProductCostingMethod: SetProductCostingMethodUseCase,
         listPrices: ListCommercialPricesUseCase,
         listPriceProposals: ListPriceProposalsUseCase,
         listCommercialPriceHistory: ListCommercialPriceHistoryUseCase,
@@ -146,6 +148,7 @@ import { ReadUiPreferencesUseCase, SaveUiPreferencesUseCase } from '@application
           readStockCard,
           issueStock,
           transferStock,
+          setProductCostingMethod,
           listPrices,
           listPriceProposals,
           listCommercialPriceHistory,
@@ -196,6 +199,7 @@ import { ReadUiPreferencesUseCase, SaveUiPreferencesUseCase } from '@application
         ReadStockCardUseCase,
         IssueStockUseCase,
         TransferStockUseCase,
+        SetProductCostingMethodUseCase,
         ListCommercialPricesUseCase,
         ListPriceProposalsUseCase,
         ListCommercialPriceHistoryUseCase,

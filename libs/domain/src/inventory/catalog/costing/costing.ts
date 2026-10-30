@@ -30,6 +30,17 @@ export class CostingMethodChangeError extends Error {
   }
 }
 
+export interface CostingPolicyChange {
+  id: string;
+  companyId: string;
+  productId: string;
+  previousMethod: CostingMethod | null;
+  newMethod: CostingMethod | null;
+  reason: string;
+  actorId: string;
+  at: string;
+}
+
 export interface CostLayer {
   id: string;
   receivedAt: string;

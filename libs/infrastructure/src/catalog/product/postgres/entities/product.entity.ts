@@ -117,3 +117,30 @@ export class PriceChangeEntity {
   @Column('timestamptz', { name: 'changed_at' })
   declare changedAt: Date;
 }
+
+@Entity({ name: 'product_costing_policy_history' })
+export class CostingPolicyChangeEntity {
+  @PrimaryColumn('uuid')
+  declare id: string;
+
+  @Column('uuid', { name: 'company_id' })
+  declare companyId: string;
+
+  @Column('uuid', { name: 'product_id' })
+  declare productId: string;
+
+  @Column('varchar', { name: 'previous_method', length: 20, nullable: true })
+  declare previousMethod: string | null;
+
+  @Column('varchar', { name: 'new_method', length: 20, nullable: true })
+  declare newMethod: string | null;
+
+  @Column('varchar', { length: 300 })
+  declare reason: string;
+
+  @Column('uuid', { name: 'changed_by' })
+  declare actorId: string;
+
+  @Column('timestamptz', { name: 'changed_at' })
+  declare changedAt: Date;
+}

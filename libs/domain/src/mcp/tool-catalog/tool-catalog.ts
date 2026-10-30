@@ -32,6 +32,7 @@ export const MCP_TOOL_CATALOG: readonly McpToolDefinition[] = [
   { name: 'analyze-media', audience: 'session', module: 'inventory', access: 'view' },
   { name: 'issue-stock', audience: 'session', module: 'inventory', access: 'edit' },
   { name: 'transfer-stock', audience: 'session', module: 'inventory', access: 'edit' },
+  { name: 'set-product-costing-method', audience: 'session', module: 'inventory', access: 'edit' },
   { name: 'list-commercial-prices', audience: 'session', module: 'prices', access: 'view' },
   { name: 'list-price-proposals', audience: 'session', module: 'prices', access: 'view' },
   { name: 'list-commercial-price-history', audience: 'session', module: 'prices', access: 'view' },

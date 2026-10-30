@@ -1,13 +1,17 @@
+import { DocumentError } from '@domain/inventory/stock/document/document';
 import { PriceError, type PriceChange } from '@domain/inventory/catalog/product/price';
 import type { PricePort } from '@domain/inventory/catalog/product/price.port';
 import type { Product } from '@domain/inventory/catalog/product/product';
 import type { CatalogItemTypeFilter, ProductPort } from '@domain/inventory/catalog/product/product.port';
 import { readProductSort, sortProducts } from '@domain/inventory/catalog/product/product-sort';
+import type { CostingPolicyChange } from '@domain/inventory/catalog/costing/costing';
+import type { CostingPolicyPort } from '@domain/inventory/catalog/costing/costing-policy.port';
 import { slicePage, type Page, type PageRequest } from '@domain/workspace/company-list/page';
 
-export class InMemoryProductRepository implements ProductPort, PricePort {
+export class InMemoryProductRepository implements ProductPort, PricePort, CostingPolicyPort {
   private products = new Map<string, Product>();
   private priceHistory = new Map<string, PriceChange[]>();
+  private costingHistory = new Map<string, CostingPolicyChange[]>();
   private readonly sequences = new Map<string, number>();
 
   async nextSequence(companyId: string): Promise<number> {
@@ -59,6 +63,20 @@ export class InMemoryProductRepository implements ProductPort, PricePort {
       pushCompanyChanges(changes, history, companyId);
     }
     return changes;
+  }
+
+  async changeProductCostingMethod(change: CostingPolicyChange): Promise<void> {
+    const productKey = key(change.companyId, change.productId);
+    const product = this.products.get(productKey);
+    if (product === undefined) {
+      throw new DocumentError('Product was not found');
+    }
+    this.products.set(productKey, { ...product, costingMethod: change.newMethod });
+    this.costingHistory.set(change.productId, [...(this.costingHistory.get(change.productId) ?? []), change]);
+  }
+
+  async productCostingHistory(companyId: string, productId: string): Promise<CostingPolicyChange[]> {
+    return (this.costingHistory.get(productId) ?? []).filter((change) => change.companyId === companyId);
   }
 }
 

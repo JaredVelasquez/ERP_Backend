@@ -3,7 +3,7 @@ import { JournalEntryError } from '@domain/accounting/journal-entry/journal-entr
 import { ModulePermissionError, PermissionDeniedError } from '@domain/identity/membership/module-access';
 import { InvalidCredentialsError, RegistrationError } from '@domain/identity/session/password-hasher.port';
 import { BarcodeError } from '@domain/inventory/catalog/barcode-sheet/barcode';
-import { InsufficientStockError, SpecificLayerRequiredError } from '@domain/inventory/catalog/costing/costing';
+import { CostingMethodChangeError, InsufficientStockError, SpecificLayerRequiredError } from '@domain/inventory/catalog/costing/costing';
 import { DocumentError } from '@domain/inventory/stock/document/document';
 import { PriceError } from '@domain/inventory/catalog/product/price';
 import { PriceWorkflowError } from '@domain/inventory/catalog/pricing/price-workflow.port';
@@ -30,6 +30,7 @@ import type { Response } from 'express';
   DocumentError,
   InsufficientStockError,
   SpecificLayerRequiredError,
+  CostingMethodChangeError,
   PriceError,
   PriceWorkflowError,
   SpreadsheetError,
@@ -55,6 +56,7 @@ export class CompanyIdentityFilter implements ExceptionFilter {
       | DocumentError
       | InsufficientStockError
       | SpecificLayerRequiredError
+      | CostingMethodChangeError
       | PriceError
       | PriceWorkflowError
       | SpreadsheetError

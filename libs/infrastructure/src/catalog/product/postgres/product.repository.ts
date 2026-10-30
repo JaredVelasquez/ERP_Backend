@@ -1,16 +1,18 @@
 import { randomUUID } from 'node:crypto';
+import { DocumentError } from '@domain/inventory/stock/document/document';
 import { PriceError, type PriceChange } from '@domain/inventory/catalog/product/price';
 import type { PricePort } from '@domain/inventory/catalog/product/price.port';
-import type { CostingMethod } from '@domain/inventory/catalog/costing/costing';
+import { type CostingMethod, type CostingPolicyChange } from '@domain/inventory/catalog/costing/costing';
+import type { CostingPolicyPort } from '@domain/inventory/catalog/costing/costing-policy.port';
 import type { Presentation, Product } from '@domain/inventory/catalog/product/product';
 import type { CatalogItemTypeFilter, ProductPort } from '@domain/inventory/catalog/product/product.port';
 import { readProductSort } from '@domain/inventory/catalog/product/product-sort';
 import { pageOffset, type Page, type PageRequest } from '@domain/workspace/company-list/page';
-import { PriceChangeEntity, PresentationEntity, ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
-import { insertProduct, readPriceHistory, readProductBarcodes, readProductPage, readProducts, recordPriceChange } from '@infrastructure/catalog/product/postgres/product.queries';
+import { CostingPolicyChangeEntity, PriceChangeEntity, PresentationEntity, ProductEntity } from '@infrastructure/catalog/product/postgres/entities/product.entity';
+import { changeProductCostingMethod, insertProduct, readPriceHistory, readProductBarcodes, readProductCostingHistory, readProductPage, readProducts, recordPriceChange } from '@infrastructure/catalog/product/postgres/product.queries';
 import type { TypeOrmExecutor } from '@infrastructure/shared/postgres/typeorm-executor';
 
-export class PostgresProductRepository implements ProductPort, PricePort {
+export class PostgresProductRepository implements ProductPort, PricePort, CostingPolicyPort {
   private readonly sequences = new Map<string, number>();
 
   constructor(private readonly database: TypeOrmExecutor) {}
@@ -66,6 +68,18 @@ export class PostgresProductRepository implements ProductPort, PricePort {
   async historyForCompany(companyId: string): Promise<PriceChange[]> {
     const rows = await this.database.withManager((manager) => readPriceHistory(manager, companyId));
     return rows.map(domainPriceChange);
+  }
+
+  async changeProductCostingMethod(change: CostingPolicyChange): Promise<void> {
+    const entity = costingPolicyChangeEntity(change);
+    const updated = await this.database.transaction(() => this.database.withManager((manager) =>
+      changeProductCostingMethod(manager, change.productId, change.newMethod, entity)));
+    if (!updated) throw new DocumentError('Product was not found');
+  }
+
+  async productCostingHistory(companyId: string, productId: string): Promise<CostingPolicyChange[]> {
+    const rows = await this.database.withManager((manager) => readProductCostingHistory(manager, companyId, productId));
+    return rows.map(domainCostingPolicyChange);
   }
 
   private bump(companyId: string, current: number): number {
@@ -145,6 +159,32 @@ function domainProduct(entity: ProductEntity): Product {
       referenceUnitCost: nullableNumber(presentation.referenceUnitCost),
       manufacturerBarcode: presentation.manufacturerBarcode,
     })),
+  };
+}
+
+function costingPolicyChangeEntity(change: CostingPolicyChange): CostingPolicyChangeEntity {
+  return Object.assign(new CostingPolicyChangeEntity(), {
+    id: change.id,
+    companyId: change.companyId,
+    productId: change.productId,
+    previousMethod: change.previousMethod,
+    newMethod: change.newMethod,
+    reason: change.reason,
+    actorId: change.actorId,
+    changedAt: new Date(change.at),
+  });
+}
+
+function domainCostingPolicyChange(entity: CostingPolicyChangeEntity): CostingPolicyChange {
+  return {
+    id: entity.id,
+    companyId: entity.companyId,
+    productId: entity.productId,
+    previousMethod: costingMethod(entity.previousMethod),
+    newMethod: costingMethod(entity.newMethod),
+    reason: entity.reason,
+    actorId: entity.actorId,
+    at: entity.changedAt.toISOString(),
   };
 }
 
