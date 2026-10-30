@@ -420,8 +420,8 @@ Pendientes. Las tareas de la fase 1 quedan cerradas como están. El detalle est�
 - **Alcance:** migrar todos los repositorios relacionales a TypeORM QueryBuilder, con una entidad y archivo `<repo>.queries.ts` por repo en infrastructure; retirar el traductor SQL de compatibilidad y hacer obligatoria esta convención en la skill backend.
 - **Protección:** `synchronize=false`, `migrationsRun=false`, conservar checksums aplicados, registrar baseline sin DDL de negocio y bloquear migración sobre esquema no registrado.
 - **Ya hecho:** PostgreSQL es el único proveedor; SQL Server/LocalDB y sus scripts/dependencias se retiraron; TypeORM DataSource/QueryRunner, transacciones, migración baseline no destructiva y guardas de migraciones están operativos; importación idempotente, compañías y listados de workspace usan entidades/QueryBuilder con consultas en archivos separados; la skill backend se actualizó; dominio, aplicación, adaptadores de infraestructura y controladores se organizaron por contexto y agregado, y la composición de Nest se movió a `apps/modules/`.
-- **Ya convertido:** repositorios de productos/precios, flujo de propuestas y auditor�a de precios, comprobantes y aprobaci�n de anulaci�n, layouts, MCP, asientos manuales, identidad, configuraci�n de IA y libro de inventario usan entidades con TypeORM QueryBuilder y consultas separadas. Los adaptadores de identidad conservan rotaci�n/reutilizaci�n de refresh tokens; el ledger mantiene atomicidad entre documento, l�neas, capas, asientos y anulaciones.
-- **Verificaci�n:** `erp_test` fue creada y migrada; `smoke:postgres:write` pas� para producto, historial de precios, ledger de inventario e inserci�n/actualizaci�n de comprobante. `smoke:postgres` de lectura pas� contra `erp_dev` (compa��a, identidad/sesi�n, productos, inventario y listados); ese smoke requiere datos existentes. `erp_dev` no fue destino de escritura.
+- **Ya convertido:** repositorios de productos/precios, flujo de propuestas y auditoría de precios, comprobantes y aprobación de anulación, layouts, MCP, asientos manuales, identidad, configuración de IA y libro de inventario usan entidades con TypeORM QueryBuilder y consultas separadas. Los adaptadores de identidad conservan rotación/reutilización de refresh tokens; el ledger mantiene atomicidad entre documento, líneas, capas, asientos y anulaciones.
+- **Verificación:** `erp_test` fue creada y migrada; `smoke:postgres:write` pasó para producto, historial de precios, ledger de inventario e inserción/actualización de comprobante. `smoke:postgres` de lectura pasó contra `erp_dev` (compañía, identidad/sesión, productos, inventario y listados); ese smoke requiere datos existentes. `erp_dev` no fue destino de escritura.
 - **Listo cuando:** cada repositorio relacional use su query builder y mapee a tipos del dominio; no queden adaptadores ni consultas heredadas; lint, suite, build, smoke PostgreSQL y flujos visuales/funcionales pasen sin recrear esquema ni perder datos.
 - **Verificacion actual:** TypeORM y QueryBuilder en repositorios y scripts de mantenimiento; traductor y ejecutor de compatibilidad retirados. Lint, 50 suites/139 pruebas, build y smokes de lectura y escritura pasan; comprobantes/R2, Chrome movil y asistente tambien pasan.
 - **Product repository:** PostgreSQL QueryBuilder entity mapping, search, paging, ordering and price history pass smoke:postgres; null price ordering matches domain sort.
@@ -429,11 +429,11 @@ Pendientes. Las tareas de la fase 1 quedan cerradas como están. El detalle est�
 - **Workspace layout repository:** TypeORM QueryBuilder persists table columns, dashboard widgets and UI preferences; save/read/update and cleanup pass the PostgreSQL browser smoke.
 - **MCP repository:** TypeORM QueryBuilder passes token issue, hash lookup, company listing, audit paging, rotation, revocation and usage timestamp checks in the PostgreSQL browser smoke.
 - **Journal-entry repository:** QueryBuilder persists balanced entry lines, idempotent retry, company-scoped reads, date range and reversal in the PostgreSQL browser smoke.
-## T-042 � Historial privado de conversaciones del asistente
+## T-042 — Historial privado de conversaciones del asistente
 
 - **Estado:** [x]
-- **Alcance:** guardar turnos de texto del asistente vinculados a usuario y empresa de la sesi�n; listar conversaciones paginadas y leer cada conversaci�n con aislamiento por propietario. No persistir archivos adjuntos ni credenciales.
-- **Protecci�n:** migraci�n TypeORM aditiva, sin `synchronize`, sin `migrationsRun` y sin borrar tablas/datos en `down`.
+- **Alcance:** guardar turnos de texto del asistente vinculados a usuario y empresa de la sesión; listar conversaciones paginadas y leer cada conversación con aislamiento por propietario. No persistir archivos adjuntos ni credenciales.
+- **Protección:** migración TypeORM aditiva, sin `synchronize`, sin `migrationsRun` y sin borrar tablas/datos en `down`.
 - **Listo cuando:** dos usuarios de la misma empresa no pueden leer el historial del otro; un usuario con varias empresas mantiene historiales separados; build, lint, tests y smoke HTTP pasan.
 - **Verificacion:** migracion 019 aplicada; 52 suites / 146 pruebas, lint/build y smokes HTTP/Chrome pasan.
 
@@ -451,7 +451,7 @@ Pendientes. Las tareas de la fase 1 quedan cerradas como están. El detalle est�
 Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión fiscal en producción hasta que el responsable confirme régimen, documentos y mecanismo autorizado.
 
 ## T-044 — Perfil y políticas fiscales por empresa
-- **Estado:** [ ] bloqueado por decisiones de negocio.
+- **Estado:** [ ] desbloqueado para desarrollo con datos sintéticos (decisión del dueño, ver `docs/BLOCKERS.md` B-004, 29-10-2026). El régimen y los datos reales se confirman antes de producción.
 - **Deps:** T-043.
 - **Hacer:** configurar perfil legal/fiscal, obligaciones, establecimientos, modalidad de emisión/registro, tasas con vigencia y excepciones sustentadas; aplicar permisos y auditoría.
 - **Regla:** los movimientos internos de inventario no exigen factura de venta; una venta no puede omitir el comprobante aplicable.
@@ -492,3 +492,54 @@ Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión f
 - **Hacer:** separar precisión de captura/cálculo de visualización; definir políticas tipadas para cantidad, factor, costo/precio unitario, importes de línea, impuesto y partidas; migrar columnas de escala 2 sin pérdida ni recálculo silencioso; unificar formateadores operativos, reportes, contabilidad y documentos fiscales.
 - **Propuesta inicial:** hasta 4 decimales en captura/cálculo de cantidades y valores unitarios; reportes contables pueden mostrar 2; documentos fiscales siguen la regla aprobada del régimen.
 - **Listo cuando:** los mismos valores de origen producen cálculos y redondeos reproducibles; las partidas cuadran; cambiar el formato visible no altera almacenamiento ni contabilidad; el histórico conserva sus valores.
+## T-051 — Plantillas predefinidas y personalizadas de documentos fiscales
+- **Estado:** [ ] propuesta; depende de aprobar el alcance fiscal de T-043/T-044.
+- **Deps:** T-043, T-044, T-045.
+- **Hacer:** crear una galería bajo Configuración > Fiscalidad > Plantillas para formatos predefinidos del sistema y copias personalizadas aisladas por empresa. Implementar editor visual de bloques y controles de estilo para personal no técnico, vista previa, borrador/publicación versionada y modo avanzado HTML con vista dividida.
+- **Seguridad fiscal:** los campos legales requeridos son bloques protegidos; la validación del servidor impide ocultarlos o publicar una plantilla incompleta. No ejecutar JavaScript ni permitir iframes/recursos remotos arbitrarios; sanitizar contenido y validar assets. Los permisos de configuración se aplican también a HTTP y MCP.
+- **Integridad:** cada documento emitido fija plantilla y versión, snapshot fiscal, referencia exacta al CAI/autorización y hash del PDF regenerado; no almacenar el PDF en bucket. Editar una plantilla predefinida crea una copia de empresa y no altera el original.
+- **Archivos:** HTML/estructura y metadatos en PostgreSQL; todos los binarios (logos, recursos y adjuntos originales POS) en Cloudflare R2 privado. La base guarda solo claves, tamaño, tipo y hash. Lectura autenticada y aislada por empresa.
+- **UX de referencia:** INNOVAISP presenta plantillas en tarjetas con miniaturas/estados y un espacio con HTML, vista previa y vista dividida. El editor visual de bloques es una capacidad añadida para que usuarios no técnicos no necesiten editar HTML.
+- **Listo cuando:** aislamiento multiempresa, permisos, sanitización, validación de campos, publicación/versionado, render determinista y preservación de documentos históricos pasan pruebas.
+
+## T-052 — Regeneración documental y ciclo histórico de CAI/autorizaciones
+- **Estado:** [ ] propuesta; parte de fase 2 fiscal.
+- **Deps:** T-043, T-044, T-045, T-051.
+- **Hacer:** guardar en PostgreSQL versiones inmutables de autorizaciones fiscales/CAI, con vigencia, establecimiento, tipo, rango, correlativo, estado, actor y auditoría; definir campos exactos según régimen aprobado. Renovaciones crean un registro nuevo, nunca sobrescriben el anterior. Alertar vencimiento/agotamiento y bloquear asignaciones fuera de rango o solapadas.
+- **Snapshot por documento:** registrar referencia/version exacta de CAI, valor autorizado, correlativo, perfil fiscal emisor/receptor, líneas, impuestos, redondeos, totales, plantilla/version, referencias de assets y renderer usados. El número emitido queda reservado una sola vez con idempotencia.
+- **Regeneración:** crear PDF/representación bajo demanda desde el snapshot y versiones fijadas; no almacenar documentos generados en R2/S3. Guardar hash y metadatos para detectar diferencias. Nunca tomar el CAI o plantilla vigentes para regenerar un documento histórico.
+- **Adjuntos:** archivos originales no regenerables se almacenan en R2 privado, nunca como binarios en PostgreSQL. Guardar en la base solo la clave de objeto y metadatos. Preservar acceso autenticado, aislamiento por empresa, límites y auditoría.
+- **Migración:** aplicar la regeneración a comprobantes PDF operativos; retirar sus PDFs existentes de R2/S3 solo tras comprobar regeneración/hash. Mantener en R2 los adjuntos originales y assets. No eliminar objetos hasta validar integridad y recuperación.
+- **Correlativos:** asignar folios de forma atómica/idempotente y auditar reserva, emisión, fallas, anulaciones y saltos. Alertar vencimiento/agotamiento. Nunca consumir numeración en vista previa. La reutilización de huecos requiere regla fiscal validada.
+- **Listo cuando:** renovar el CAI no afecta documentos anteriores; regenerar conserva CAI, correlativo, contenido, plantilla y recursos originales; ningún PDF generado se persiste en R2/S3 y ningún binario se guarda en PostgreSQL.
+## T-053 — Bodegas múltiples con inventario independiente
+- **Estado:** [ ] desbloqueado; decisión de diseño tomada por el dueño el 29-10-2026 (ver abajo).
+- **Deps:** T-024, T-025, T-028, T-029.
+- **Decisión de diseño (29-10-2026):** cada bodega tiene su propio inventario (capas y saldos aislados, no solo por empresa/producto) y su propio efecto contable por separado — un movimiento entre bodegas no es invisible contablemente. El dueño señaló que lo más estándar es separar también por centro de costo. Este ERP (a diferencia del Eterbook/COMPAC anterior, que ya traía `Departamento`/`Proyecto` por partida) **no tiene hoy esa dimensión**; T-053 debe introducirla: un centro de costo por bodega, sin duplicar el plan de cuentas — la cuenta de inventario sigue siendo la misma, pero cada línea del asiento lleva el centro de costo de su bodega.
+- **Hacer:** administrar bodegas desde Configuración (crear, renombrar, desactivar sin borrar historia; asociar un centro de costo); asignar bodega a cada documento/capa/movimiento; filtrar fichas, existencias e informes por bodega; seleccionar origen y destino para traslados con consumo de capas, costos, asientos e idempotencia atómicos — el asiento de traslado carga/abona a las cuentas de inventario con el centro de costo de cada bodega; conservar `Principal` y migrar a ella los saldos históricos sin cambiar sus valores.
+- **Regla:** no habilitar una bodega seleccionable hasta que cada escritura/lectura de inventario esté delimitada a ella. Una lista de bodegas con saldo global compartido sería engañosa. Un traslado entre bodegas de la misma empresa no genera ingreso/costo de venta, solo mueve el inventario entre centros de costo.
+- **Listo cuando:** los permisos y el aislamiento por empresa/bodega se validan en HTTP y MCP; una transferencia cambia ambos saldos y sus capas una sola vez y dentro de la misma transacción genera el asiento con los centros de costo correctos; las salidas no consumen existencias de otra bodega; los saldos históricos cuadran antes/después de la migración; un reporte por centro de costo/bodega concilia contra el saldo de inventario de esa bodega.
+
+## T-054 — Política de costeo general editable
+- **Estado:** [ ] parcial; el dominio ya acepta métodos por empresa y por producto, pero el predeterminado de empresa no tiene pantalla/API de edición.
+- **Deps:** T-024, T-025.
+- **Hacer:** selector general en Configuración de inventario; selector por producto con opción `Usar predeterminado de la empresa` y los métodos admitidos (PEPS, UEPS, FEFO, promedio e identificación específica); aplicar la regla a ficha, confirmación de salidas, importaciones y MCP; registrar actor/fecha del cambio. No cambiar silenciosamente el método de productos con saldo ni revaluar capas.
+- **Listo cuando:** salidas usan la excepción de producto o, si está vacía, la política de empresa; cambios con existencias se rechazan o siguen una migración/revaluación autorizada y auditable.
+## T-055 — Catálogo de documentos comerciales, compras y fiscales
+- **Estado:** [ ] pendiente; el sandbox actual solo cubre la vista preliminar de factura desde venta confirmada.
+- **Deps:** T-043, T-044, T-045, T-047, T-051, T-052, T-053.
+- **Hacer:** catálogo con cotizaciones, proformas, requisiciones, solicitudes y órdenes de compra, facturas, notas de crédito/débito, retenciones y traslados entre bodegas. Implementar estados y aprobaciones por rol, vínculos con origen, conversiones seguras e historial. Añadir plantillas versionadas A4 editables con editor visual, vista previa y opciones de tamaño/orientación/márgenes; mantener HTML avanzado sanitizado para administrador.
+- **Integridad:** cotizaciones, proformas, requisiciones y solicitudes no contabilizan ni mueven stock por sí mismas; la orden de compra no recibe stock hasta el documento de recepción; traslados confirman ambos almacenes en una transacción; notas correctivas enlazan documento original; devolución de dinero y reintegro físico son procesos explícitos y separados.
+- **Archivos:** formatos generados bajo demanda sin persistir PDFs; los originales y logos van a R2 privado, nunca como bytes en PostgreSQL. Datos fiscales en desarrollo son sintéticos y `DEV-NOT-VALID`.
+- **Listo cuando:** cada tipo conserva su ciclo de vida y permisos, conversión/reintento no duplica líneas, saldos, impuestos ni asientos, plantilla/A4 reproduce snapshots históricos, y reportes concilian sus efectos.
+### Actualización de desarrollo (2026-10-27)
+- T-043 tiene una implementación parcial de sandbox: emisión ficticia únicamente desde venta confirmada, secuencia/idempotencia PostgreSQL, snapshot con huella y vista imprimible marcada `DEV-NOT-VALID`.
+- Esto no cierra la emisión fiscal autorizada, las políticas por empresa, las plantillas editables ni el ciclo completo de CAI. Siguen bloqueados para producción por B-002 y las decisiones fiscales.
+
+### Seguimiento de T-055 (2026-10-27)
+- **Estado:** parcial. Existe /erp/business-documents y /erp/document-templates, con un centro responsive para crear/listar documentos ficticios, formatos versionados por empresa, borrador/publicación, vista previa e impresión A4/Carta vertical/horizontal con logo configurado.
+- **Tipos visibles:** factura de prueba no fiscal, proforma, cotización, requisición, solicitud y orden de compra, traslado entre bodegas, notas de crédito/débito y retención.
+- **Persistencia:** migraciones aditivas 021 y 022; snapshot con hash guarda la versión del formato y datos mostrados. synchronize continúa desactivado.
+- **Límite:** este centro todavía no implementa conversiones, aprobaciones/ciclos de compras, ejecución real de traslados, enlace obligatorio de notas/retenciones ni emisión fiscal autorizada. Esos efectos no ocurren al crear un documento de desarrollo.
+
+- **Ampliación de T-055:** formatos estándar faltantes se pueden preparar en lote; los formularios capturan datos específicos de compras, traslado, notas y retención. Las notas/retenciones exigen una factura de prueba del mismo negocio; se conserva su id y número en el snapshot. La orden de compra puede enlazar una solicitud de compra existente.

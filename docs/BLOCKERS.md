@@ -22,3 +22,13 @@ No hay un bloqueo para escribir el esquema ni los casos de uso. Estas paradas ap
 - **Estado:** resuelto en desarrollo el 18-10-2026.
 - **Tarea:** T-006b y T-F002.
 - **Resolución:** `POST /identity/companies` comprueba email y contraseña sin crear sesión y devuelve las membresías de ese usuario. La tienda muestra la elección cuando hay varias empresas y luego inicia sesión con el `companyId` seleccionado.
+
+## B-004 — Fiscal (T-043 a T-052): el dueño autorizó avanzar en desarrollo con datos sintéticos
+
+- **Tipo:** decision_negocio
+- **Tarea:** T-043, T-044, T-045, T-047, T-051, T-052
+- **Estado:** resuelto para DESARROLLO el 29-10-2026; sigue abierto para PRODUCCIÓN.
+- **Decisión del dueño (29-10-2026):** no detener el módulo fiscal esperando la confirmación del contador/SAR ni el alta real de Michelle (B-002). Avanzar con datos de prueba realistas y, antes de habilitar emisión real, hacer la configuración fiscal verdadera.
+- **Dato de prueba adoptado:** formato hondureño de CAI de fuentes públicas secundarias (no es texto oficial del SAR, ver nota en `docs/PHASE_2_PLAN.md`): CAI alfanumérico de 37 caracteres en 6 grupos separados por guion (ej. `ABCD12-345678-9ABCDE-F01234-567890-AB`); número de documento correlativo de 16 dígitos segmentado establecimiento(3)-punto de emisión(3)-tipo de documento(2)-correlativo(8) (ej. `000-001-01-00000123`); RTN de 14 dígitos; rango autorizado con número inicial, final y fecha límite de emisión.
+- **Marcado:** todo dato y documento generado bajo esta decisión se etiqueta `DEV-NOT-VALID` en el snapshot y en la vista imprimible, igual que el resto del sandbox de T-043/T-055.
+- **Acción humana antes de producción:** reemplazar el régimen, los documentos aplicables, el mecanismo de autorización y el CAI real confirmados por el contador y el SAR; no reutilizar el CAI de prueba.
