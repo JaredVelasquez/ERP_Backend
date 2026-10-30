@@ -513,7 +513,7 @@ Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión f
 - **Correlativos:** asignar folios de forma atómica/idempotente y auditar reserva, emisión, fallas, anulaciones y saltos. Alertar vencimiento/agotamiento. Nunca consumir numeración en vista previa. La reutilización de huecos requiere regla fiscal validada.
 - **Listo cuando:** renovar el CAI no afecta documentos anteriores; regenerar conserva CAI, correlativo, contenido, plantilla y recursos originales; ningún PDF generado se persiste en R2/S3 y ningún binario se guarda en PostgreSQL.
 ## T-053 — Bodegas múltiples con inventario independiente
-- **Estado:** [~] backend completo (HTTP y MCP) el 29-10-2026; falta construir la pantalla en la tienda/admin (frontend).
+- **Estado:** [x] completo el 29-10-2026 (backend, MCP y pantalla en `ERP_FRONTEND`).
 - **Deps:** T-024, T-025, T-028, T-029.
 - **Hecho:**
   - Las capas de costo ya estaban aisladas por `(empresa, bodega, producto)` desde una migración previa (`026_phase2_financial_inventory_controls.sql`); lo que faltaba era la operación de traslado y la administración de bodegas, no el aislamiento en sí.
@@ -524,8 +524,10 @@ Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión f
   - Filtrar por bodega: `GET /erp/stock-cards` ya aceptaba `warehouseId`; no se tocó.
   - Herramienta MCP `transfer-stock` (mismos permisos y validaciones que el HTTP; módulo `inventory`, acceso `edit`), catálogo MCP ahora con 55 herramientas.
   - **Verificado:** lint, build (4 apps) y 58 suites/160 pruebas en verde, incluidas dos pruebas de extremo a extremo (HTTP y MCP): traslado real, idempotencia, rechazo de origen=destino, operador sin permiso de edición rechazado con 403.
+  - Pantalla en `ERP_FRONTEND` (`settings/ui/company-controls-panel.tsx`: renombrar/activar/desactivar bodega; `inventory/ui/warehouse-transfer-panel.tsx`: traslado con búsqueda de producto y existencia real por bodega de origen).
+  - **Bugs reales encontrados y corregidos al probar contra Postgres real (no solo pruebas con repos en memoria), ver commit `58e0a37`:** `CompanyControlsError` existía en el dominio pero nunca se usaba ni estaba registrado en `CompanyIdentityFilter` — renombrar/desactivar bodega devolvía 500 en vez de 400. Ya corregido para todo `company-controls.queries.ts`.
 - **Pendiente:**
-  - Pantalla en `ERP_FRONTEND`/`ERP_ADMIN` para crear/renombrar/desactivar bodegas y hacer el traslado (hoy solo existe la API/MCP).
+  - `ERP_ADMIN` no tiene pantalla de bodegas (no se evaluó si corresponde ahí; `ERP_FRONTEND` es donde vive hoy Configuración de inventario).
   - El tablero (`dashboard.use-case.ts`) todavía no filtra por bodega; `stock-cards` sí.
   - No se migró ningún saldo histórico porque en desarrollo solo existe la bodega Principal; la migración de saldos reales queda para cuando una empresa real tenga más de una bodega.
 - **Decisión de diseño (29-10-2026):** cada bodega tiene su propio inventario (capas y saldos aislados, no solo por empresa/producto) y su propio efecto contable por separado — un movimiento entre bodegas no es invisible contablemente. El dueño señaló que lo más estándar es separar también por centro de costo. Este ERP (a diferencia del Eterbook/COMPAC anterior, que ya traía `Departamento`/`Proyecto` por partida) **no tiene hoy esa dimensión**; T-053 debe introducirla: un centro de costo por bodega, sin duplicar el plan de cuentas — la cuenta de inventario sigue siendo la misma, pero cada línea del asiento lleva el centro de costo de su bodega.
@@ -534,15 +536,17 @@ Alcance y decisiones abiertas: `docs/PHASE_2_PLAN.md`. No se habilita emisión f
 - **Listo cuando:** los permisos y el aislamiento por empresa/bodega se validan en HTTP y MCP; una transferencia cambia ambos saldos y sus capas una sola vez y dentro de la misma transacción genera el asiento con los centros de costo correctos; las salidas no consumen existencias de otra bodega; los saldos históricos cuadran antes/después de la migración; un reporte por centro de costo/bodega concilia contra el saldo de inventario de esa bodega.
 
 ## T-054 — Política de costeo general editable
-- **Estado:** [x] API/MCP listos el 29-10-2026; falta la pantalla en frontend/admin.
+- **Estado:** [x] completo el 29-10-2026 (API, MCP y selector por producto en `ERP_FRONTEND`).
 - **Deps:** T-024, T-025.
 - **Hecho:**
   - **Empresa (predeterminado general):** ya existía `PUT /erp/company-controls` (`ManageCompanyControlsUseCase.save`) con historial en `company_costing_policy_history`, pero **cambiaba el método en silencio sin revisar existencias** — un hueco real. Se agregó el guardia: `saveControls` ahora rechaza el cambio (`CostingMethodChangeError`, mapeado a 400) si algún producto que usa el predeterminado (`costing_method IS NULL`) tiene saldo en cualquier bodega. Verificado manualmente contra `erp_dev` con un script desechable (rechaza con saldo > 0, permite con saldo en 0).
   - **Producto (excepción):** nuevo `SetProductCostingMethodUseCase` (`libs/application/src/inventory/catalog/costing/set-product-costing-method.use-case.ts`) + puerto `CostingPolicyPort` (`changeProductCostingMethod`/`productCostingHistory`), implementado en memoria y Postgres sobre el mismo repositorio de productos (igual patrón que `PricePort`). Rechaza el cambio con `CostingMethodChangeError` si el producto tiene saldo en cualquier bodega; `costingMethod: null` vuelve a "usar el predeterminado de la empresa". Exige una razón no vacía y registra actor/fecha en `product_costing_policy_history` (migración `028`).
   - Endpoint `PUT /erp/products/:id/costing-method` y herramienta MCP `set-product-costing-method` (catálogo MCP ahora con 56 herramientas), mismos permisos (`inventory`/`edit`) que el resto de inventario.
   - La regla de resolución (`resolveCostingMethod`: producto si tiene uno propio, si no el de la empresa) ya se aplicaba en ficha, confirmación de documentos, traslados e importaciones — no hizo falta tocarla, solo exponer cómo se *cambia* el método.
-  - **Verificado:** lint, build (4 apps) y 61 suites/167 pruebas en verde, incluidas pruebas HTTP y MCP de extremo a extremo (fijar excepción, rechazo con saldo, razón vacía, método desconocido, operador sin permiso).
-- **Pendiente:** pantalla en `ERP_FRONTEND` (selector por producto) y `ERP_ADMIN`/Configuración (selector general); no hay endpoint de lectura del historial todavía (el registro queda en la base, pero nadie lo consulta aún).
+  - Pantalla en `ERP_FRONTEND`: `products/ui/products-page.tsx` tiene la acción de fila "Cambiar método de costeo" (diálogo con el selector y motivo obligatorio); el selector general de empresa ya existía en `settings/ui/company-controls-panel.tsx`.
+  - **Bug real corregido al probar contra Postgres real:** `CostingPolicyChangeEntity` nunca se registró en la lista de entidades de TypeORM — cambiar el método de un producto fallaba con 500 ("No metadata for CostingPolicyChangeEntity was found") fuera de las pruebas con repositorios en memoria. Corregido en `typeorm-data-source.ts`, con una prueba que evita que se repita (commit `58e0a37`).
+  - **Verificado:** lint, build (4 apps) y 61 suites/168 pruebas en verde, incluidas pruebas HTTP y MCP de extremo a extremo, más un script de extremo a extremo contra Postgres real (no solo repos en memoria) que encontró el bug anterior.
+- **Pendiente:** `ERP_ADMIN` no tiene este selector (no se evaluó si corresponde ahí); no hay endpoint de lectura del historial todavía (el registro queda en la base, pero nadie lo consulta aún).
 ## T-055 — Catálogo de documentos comerciales, compras y fiscales
 - **Estado:** [ ] pendiente; el sandbox actual solo cubre la vista preliminar de factura desde venta confirmada.
 - **Deps:** T-043, T-044, T-045, T-047, T-051, T-052, T-053.
